@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>ดัมมี่ไทย 🎴</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- บังคับแนวนอน (มือถือถือแนวตั้ง) -->
+  <div id="rotate" class="overlay hidden">
+    <div class="rotate-box">📱➡️ กรุณาหมุนจอเป็นแนวนอน</div>
+  </div>
+
+  <!-- ข้อความแจ้งเตือนชั่วคราว -->
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- ===== จอ 1: ล็อบบี้ ===== -->
+  <section id="screen-lobby" class="screen">
+    <div class="card-panel">
+      <h1>🎴 ดัมมี่ไทย</h1>
+      <input id="name-input" maxlength="12" placeholder="ชื่อของคุณ" />
+      <button id="btn-create" class="primary">สร้างห้องใหม่</button>
+      <div class="divider">หรือ</div>
+      <input id="code-input" maxlength="4" placeholder="รหัสห้อง (4 ตัว)" style="text-transform:uppercase" />
+      <button id="btn-join">เข้าห้อง</button>
+    </div>
+  </section>
+
+  <!-- ===== จอ 2: ห้องรอ ===== -->
+  <section id="screen-waiting" class="screen hidden">
+    <div class="card-panel">
+      <h2>ห้อง <span id="room-code" class="code"></span></h2>
+      <p class="hint">บอกรหัสนี้ให้เพื่อน — เริ่มได้เมื่อครบ 4 คน</p>
+      <ul id="waiting-players" class="player-list"></ul>
+      <button id="btn-start" class="primary hidden">เริ่มเกม</button>
+      <p id="waiting-hint" class="hint"></p>
+    </div>
+  </section>
+
+  <!-- ===== จอ 3: โต๊ะเล่น (แนวนอน) ===== -->
+  <section id="screen-table" class="screen hidden">
+    <div class="table-grid">
+      <!-- คู่ต่อสู้ 3 คน -->
+      <div class="seat seat-top"    data-slot="top"></div>
+      <div class="seat seat-left"   data-slot="left"></div>
+      <div class="seat seat-right"  data-slot="right"></div>
+
+      <!-- กลางโต๊ะ: กองจั่ว + กองทิ้ง -->
+      <div class="center">
+        <div class="stock">
+          <div class="card-back lg" id="stock-pile"></div>
+          <div class="stock-count" id="stock-count">0</div>
+        </div>
+        <div class="discard-wrap">
+          <div class="discard-label">กองทิ้ง</div>
+          <div id="discard-pile" class="discard-pile"></div>
+        </div>
+      </div>
+
+      <!-- ตัวเรา (ล่าง) -->
+      <div class="seat seat-self" data-slot="self"></div>
+
+      <!-- มือเรา + แถบปุ่ม -->
+      <div class="myhand-area">
+        <div id="status-bar" class="status-bar"></div>
+        <div id="my-hand" class="my-hand"></div>
+        <div id="action-bar" class="action-bar"></div>
+        <div id="hint-bar" class="hint-bar"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== จอ 4: สรุปรอบ / จบแมตช์ ===== -->
+  <section id="screen-summary" class="screen hidden">
+    <div class="card-panel wide">
+      <h2 id="summary-title">สรุปรอบ</h2>
+      <table id="summary-table" class="summary-table"></table>
+      <div id="summary-actions"></div>
+    </div>
+  </section>
+
+  <!-- popup: host ตัดสินใจเมื่อมีคนหลุดเกิน grace -->
+  <div id="dc-popup" class="overlay hidden">
+    <div class="card-panel">
+      <h3 id="dc-text">มีผู้เล่นหลุด</h3>
+      <button id="dc-wait">รอต่อ</button>
+      <button id="dc-end" class="danger">จบแมตช์</button>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="js/socket.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

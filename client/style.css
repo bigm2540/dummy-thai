@@ -1,0 +1,144 @@
+/* ===== ธีม + พื้นฐาน ===== */
+:root{
+  --felt:#0b6b3a; --felt-dark:#084d2a; --wood:#6b3f1d; --gold:#d4af37;
+  --card-bg:#fdfaf2; --red:#c0392b; --black:#1c1c1c;
+  --panel:#13241b; --text:#f3efe0; --dim:#9fb3a6;
+}
+*{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
+html,body{height:100%;}
+body{
+  font-family:"Segoe UI",system-ui,"Sukhumvit Set","Thonburi",sans-serif;
+  background:radial-gradient(circle at 50% 35%,var(--felt),var(--felt-dark));
+  color:var(--text); overflow:hidden; user-select:none;
+}
+.hidden{display:none !important;}
+
+/* ===== จอ ===== */
+.screen{position:absolute; inset:0; display:flex; align-items:center; justify-content:center; padding:12px;}
+.card-panel{
+  background:var(--panel); border:2px solid var(--gold); border-radius:14px;
+  padding:22px 26px; width:min(420px,92vw); display:flex; flex-direction:column; gap:12px;
+  box-shadow:0 8px 30px rgba(0,0,0,.5);
+}
+.card-panel.wide{width:min(680px,94vw);}
+h1{text-align:center; font-size:30px; color:var(--gold);}
+h2{text-align:center; color:var(--gold);}
+.code{letter-spacing:4px; background:#000; padding:2px 10px; border-radius:6px;}
+.hint{color:var(--dim); font-size:13px; text-align:center;}
+.divider{text-align:center; color:var(--dim); font-size:12px;}
+
+input{
+  padding:11px 13px; border-radius:8px; border:1px solid #2c3f33;
+  background:#0d1712; color:var(--text); font-size:16px;
+}
+button{
+  padding:11px 14px; border-radius:8px; border:1px solid var(--gold);
+  background:#1c3326; color:var(--text); font-size:15px; cursor:pointer; transition:.12s;
+}
+button:hover{background:#26442f;}
+button.primary{background:var(--gold); color:#1c1c1c; font-weight:700; border:none;}
+button.danger{background:#7a241b; border-color:#c0392b;}
+button:disabled{opacity:.4; cursor:not-allowed;}
+
+.player-list{list-style:none; display:flex; flex-direction:column; gap:6px;}
+.player-list li{background:#0d1712; padding:8px 12px; border-radius:8px; display:flex; justify-content:space-between;}
+.player-list .host-badge{color:var(--gold); font-size:12px;}
+.player-list .off{color:var(--dim); font-style:italic;}
+
+/* ===== โต๊ะ ===== */
+.table-grid{
+  position:absolute; inset:0;
+  display:grid; gap:6px; padding:8px;
+  grid-template-columns: 150px 1fr 150px;
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas:
+    "top   top    top"
+    "left  center right"
+    "self  self   self";
+}
+.seat{
+  background:linear-gradient(160deg,#16291e,#0d1c14); border:1px solid #2c3f33;
+  border-radius:12px; padding:8px 10px; font-size:12px;
+  display:flex; flex-direction:column; gap:5px; align-self:start;
+}
+.seat-top{grid-area:top; flex-direction:row; align-items:center; gap:12px; flex-wrap:wrap; justify-content:center;}
+.seat-left{grid-area:left;} .seat-right{grid-area:right;}
+.seat-self{grid-area:self; display:none;}
+.seat.active{border-color:var(--gold); box-shadow:0 0 0 2px var(--gold),0 0 16px rgba(212,175,55,.6);}
+.seat .nm{font-weight:700; display:flex; align-items:center; gap:6px;}
+.seat .nm .dot{width:8px; height:8px; border-radius:50%; background:#3fae6a; flex:0 0 auto;}
+.seat .nm .dot.off{background:#c0392b;}
+.seat .nm .sc{margin-left:auto; color:var(--gold); font-variant-numeric:tabular-nums;}
+.seat .turn-tag{font-size:10px; color:#1c1c1c; background:var(--gold); padding:1px 6px; border-radius:8px; font-weight:700;}
+.seat .backs{display:flex;}
+.seat .backs .card-back{margin-left:-16px;}
+.seat .backs .card-back:first-child{margin-left:0;}
+.seat .melds{display:flex; flex-wrap:wrap; gap:4px;}
+.seat-top .col{display:flex; flex-direction:column; gap:5px;}
+
+/* ไพ่หลังคว่ำ */
+.card-back{
+  width:30px; height:44px; flex:0 0 auto; border-radius:5px;
+  background:repeating-linear-gradient(45deg,#7a1f2b,#7a1f2b 4px,#9c2c3a 4px,#9c2c3a 8px);
+  border:1px solid var(--gold); box-shadow:inset 0 0 0 2px rgba(212,175,55,.25);
+}
+.card-back.lg{width:40px; height:58px;}
+
+.center{grid-area:center; display:flex; align-items:center; justify-content:center; gap:20px; flex-wrap:wrap;}
+.stock{display:flex; flex-direction:column; align-items:center; gap:4px;}
+.stock .card-back{cursor:default;}
+.stock-count{font-size:12px; color:var(--dim);}
+.discard-wrap{max-width:60%; background:rgba(0,0,0,.2); border-radius:10px; padding:8px;}
+.discard-label{font-size:11px; color:var(--dim); margin-bottom:4px; text-align:center;}
+.discard-pile{display:flex; gap:3px; overflow-x:auto; padding-bottom:4px; max-width:100%; min-height:48px; align-items:center;}
+.discard-pile .card.dug{outline:2px solid #6ee7a0;} /* ไพ่ที่จะขุด */
+.discard-pile .card.target{outline:3px solid var(--gold); transform:translateY(-4px);}
+
+/* ===== ไพ่ ===== */
+.card{
+  width:46px; height:66px; flex:0 0 auto; background:linear-gradient(160deg,#fff,#f1ead4); color:var(--black);
+  border-radius:6px; border:1px solid #00000033; position:relative; cursor:default;
+  display:flex; flex-direction:column; justify-content:space-between; padding:4px 5px; font-weight:700;
+  box-shadow:0 1px 3px rgba(0,0,0,.35);
+}
+.card.sm{width:30px; height:44px; font-size:11px; padding:2px 3px;}
+.card.red{color:var(--red);}
+.card .rk{font-size:14px; line-height:1;}
+.card .st{font-size:14px; align-self:flex-end; line-height:1;}
+.card.sm .rk,.card.sm .st{font-size:10px;}
+.card.speto{border:2px solid var(--gold); box-shadow:0 0 6px var(--gold);}
+.card.speto::after{content:"★"; position:absolute; top:1px; right:3px; color:var(--gold); font-size:9px;}
+.card.head::before{content:"♛"; position:absolute; top:1px; left:3px; color:var(--gold); font-size:10px;}
+.card.selectable{cursor:pointer;}
+.card.selected{transform:translateY(-10px); outline:2px solid var(--gold);}
+.card.targetable{cursor:pointer; outline:2px dashed #fff;}
+
+/* ===== มือเรา + ปุ่ม ===== */
+.myhand-area{grid-area:self; display:flex; flex-direction:column; gap:4px; align-items:center;}
+.status-bar{font-size:12px; color:var(--dim); display:flex; gap:12px; flex-wrap:wrap; justify-content:center;}
+.status-bar b{color:var(--gold);}
+.my-hand{display:flex; gap:3px; overflow-x:auto; padding:4px; max-width:100%; min-height:62px; align-items:flex-end;}
+.action-bar{display:flex; gap:6px; flex-wrap:wrap; justify-content:center; min-height:38px;}
+.action-bar button{padding:8px 12px;}
+.hint-bar{font-size:12px; color:var(--gold); min-height:16px;}
+.meld-box{display:flex; gap:1px; padding:2px; border-radius:4px; background:rgba(255,255,255,.06);}
+.meld-box.layoff-target{outline:2px dashed var(--gold); cursor:pointer;}
+
+/* ===== สรุป ===== */
+.summary-table{width:100%; border-collapse:collapse; font-size:14px;}
+.summary-table th,.summary-table td{padding:7px 9px; border-bottom:1px solid #2c3f33; text-align:left;}
+.summary-table td.pos{color:#6ee7a0;} .summary-table td.neg{color:#ff8a7a;}
+.summary-table .win{color:var(--gold); font-weight:700;}
+#summary-actions{display:flex; gap:8px; justify-content:center; margin-top:14px;}
+.breakdown{font-size:11px; color:var(--dim);}
+
+/* ===== overlay/toast ===== */
+.overlay{position:fixed; inset:0; background:rgba(0,0,0,.75); display:flex; align-items:center; justify-content:center; z-index:50;}
+.rotate-box{font-size:22px; text-align:center; color:var(--gold);}
+.toast{position:fixed; top:14px; left:50%; transform:translateX(-50%); background:#7a241b; color:#fff;
+  padding:10px 18px; border-radius:8px; z-index:60; font-size:14px; box-shadow:0 4px 16px rgba(0,0,0,.5);}
+
+/* บังคับแนวนอนบนมือถือ */
+@media (max-width:820px) and (orientation:portrait){
+  #rotate{display:flex !important;}
+}
