@@ -34,14 +34,16 @@ function randomToken() {
 
 // ---------- สร้าง/เข้า/ออกห้อง ----------
 export function createRoom({
-  hostName, config = DEFAULT_CONFIG, settings = DEFAULT_SETTINGS,
+  hostName, config = DEFAULT_CONFIG, moneyRate, settings = DEFAULT_SETTINGS,
   genCode = randomCode, genToken = randomToken,
 } = {}) {
+  // เรทเงิน (บาท/คะแนน) ที่ host เลือก → override moneyRate ใน config
+  const rate = Number(moneyRate) > 0 ? Number(moneyRate) : config.moneyRate;
   const room = {
     code: genCode(),
     hostId: null,
     players: [],          // เรียงตาม seat
-    config,
+    config: { ...config, moneyRate: rate },
     settings,
     status: 'WAITING',    // WAITING / PLAYING / FINISHED
     round: null,
