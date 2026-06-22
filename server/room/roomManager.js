@@ -222,6 +222,20 @@ export function closeRoom(room) {
   return room;
 }
 
+// เริ่มแมตช์ใหม่หลังจบแมตช์ (host) → รีเซ็ตคะแนนสะสม กลับห้องรอ (คงผู้เล่น+เรทเงินเดิม)
+export function newMatch(room) {
+  if (room.status !== 'FINISHED') throw new Error('เริ่มแมตช์ใหม่ได้เฉพาะตอนจบแมตช์แล้ว');
+  room.players.forEach((p) => { p.totalScore = 0; });
+  room.status = 'WAITING';
+  room.round = null;
+  room.awaitingNextRound = false;
+  room.lastSummary = null;
+  room.finalSummary = null;
+  room.dealerSeat = 0;
+  room.direction = 1;
+  return room;
+}
+
 // ---------- views (ส่งให้ client) ----------
 // view สำหรับผู้เล่นคนหนึ่ง — รวมข้อมูลห้อง + (ถ้ากำลังเล่น) มุมมองรอบของเขา
 export function getRoomView(room, playerId) {

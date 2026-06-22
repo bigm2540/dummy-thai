@@ -179,6 +179,27 @@ test('room:leave: กลางเกม → ปฏิเสธ', () => {
   assert.match(res.error, /กลางเกม/);
 });
 
+test('room:newMatch: host เริ่มใหม่หลังจบแมตช์ → กลับห้องรอ (คะแนนรีเซ็ต)', () => {
+  const { io, sockets } = setupRoom();
+  call(sockets.s1, 'room:start', {});
+  call(sockets.s1, 'room:close', {});                 // จบแมตช์
+  const bad = call(sockets.s2, 'room:newMatch');       // ไม่ใช่ host
+  assert.equal(bad.ok, false);
+  const res = call(sockets.s1, 'room:newMatch');       // host
+  assert.equal(res.ok, true);
+  const v = lastUpdate(io, 'sid1');
+  assert.equal(v.status, 'WAITING');
+  assert.ok(v.players.every((p) => p.totalScore === 0));
+});
+
+test('room:create: ส่ง moneyRate → view.moneyRate ตรง', () => {
+  const io = makeFakeIo();
+  createGameServer(io);
+  const s1 = io._connect('sid1');
+  call(s1, 'room:create', { name: 'A', moneyRate: 10 });
+  assert.equal(lastUpdate(io, 'sid1').moneyRate, 10);
+});
+
 test('disconnect ตอน PLAYING + rejoin ด้วย token → กลับที่นั่งเดิม connected=true', () => {
   const io = makeFakeIo();
   const server = createGameServer(io);

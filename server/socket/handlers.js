@@ -42,9 +42,9 @@ export function createGameServer(io) {
       if (r.hostId !== socket.data.playerId) throw new Error('เฉพาะ host ทำได้');
     };
 
-    socket.on('room:create', ({ name, config } = {}, cb) => {
+    socket.on('room:create', ({ name, moneyRate } = {}, cb) => {
       try {
-        const r = rm.createRoom({ hostName: name, config });
+        const r = rm.createRoom({ hostName: name, moneyRate });
         rooms.set(r.code, r);
         const host = r.players[0];
         bindSocket(socket, r.code, host.id);
@@ -109,6 +109,16 @@ export function createGameServer(io) {
       try {
         const r = room(); requireHost(r);
         rm.closeRoom(r);
+        reply(cb, true);
+        broadcast(r.code);
+      } catch (e) { reply(cb, false, { error: e.message }); }
+    });
+
+    // host เริ่มแมตช์ใหม่หลังจบแมตช์ → รีเซ็ตคะแนน กลับห้องรอ
+    socket.on('room:newMatch', (_payload, cb) => {
+      try {
+        const r = room(); requireHost(r);
+        rm.newMatch(r);
         reply(cb, true);
         broadcast(r.code);
       } catch (e) { reply(cb, false, { error: e.message }); }
