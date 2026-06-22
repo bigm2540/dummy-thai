@@ -114,6 +114,22 @@ export function createGameServer(io) {
       } catch (e) { reply(cb, false, { error: e.message }); }
     });
 
+    // ออกจากห้องเอง (ได้เฉพาะตอนรอเริ่ม WAITING หรือจบแมตช์ FINISHED — กลางเกมห้าม)
+    socket.on('room:leave', (_payload, cb) => {
+      try {
+        const { code, playerId } = socket.data;
+        const r = rooms.get(code);
+        if (!r) throw new Error('ไม่พบห้อง');
+        if (r.status === 'PLAYING') throw new Error('กลางเกมออกไม่ได้ (รอจบรอบ/จบแมตช์)');
+        rm.leaveRoom(r, playerId);          // throw ถ้ากลางเกม (กันซ้ำ)
+        conns.get(code)?.delete(playerId);
+        clearGrace(code, playerId);
+        socket.data = {};
+        reply(cb, true);
+        broadcast(code);                    // ห้องที่เหลือ refresh (id เสถียร — view ไม่เพี้ยน)
+      } catch (e) { reply(cb, false, { error: e.message }); }
+    });
+
     // host ตัดสินใจเมื่อมีคนหลุดเกิน grace: 'wait' (รอต่อ) / 'end' (จบแมตช์)
     socket.on('peer:resolve', ({ decision } = {}, cb) => {
       try {
@@ -130,21 +146,27 @@ export function createGameServer(io) {
       const map = conns.get(code);
       if (map && map.get(playerId) === socket.id) map.delete(playerId); // ลบเฉพาะถ้ายังเป็น socket ปัจจุบัน
       const r = rooms.get(code);
-      if (!r) return;
-      if (r.status === 'WAITING') {
-        try { rm.leaveRoom(r, playerId); } catch { /* อาจถูกลบไปแล้ว */ }
-        broadcast(code);
-        return;
-      }
-      // กำลังเล่น → mark หลุด + จับเวลา grace แล้วเด้ง popup ให้ host
+      if (!r || r.status === 'FINISHED') return;
+      // หลุด (ทั้งห้องรอ + กำลังเล่น) → mark offline ไม่ลบทันที (กันหลุดแว้บเดียวห้องพัง) + จับเวลา grace
       rm.markDisconnected(r, playerId);
       broadcast(code);
       clearGrace(code, playerId);
       const k = keyOf(code, playerId);
       graceTimers.set(k, setTimeout(() => {
         graceTimers.delete(k);
-        const hostSid = conns.get(code)?.get(r.hostId);
-        if (hostSid) io.to(hostSid).emit('peer:graceExpired', { playerId });
+        const r2 = rooms.get(code);
+        if (!r2) return;
+        const p = rm.playerById(r2, playerId);
+        if (!p || p.connected) return; // กลับมาแล้วใน grace → ไม่ต้องทำอะไร
+        if (r2.status === 'WAITING') {
+          // ยังไม่กลับใน grace → เอาออกจากห้องรอ (เปิดที่ว่าง)
+          try { rm.leaveRoom(r2, playerId); } catch { /* */ }
+          broadcast(code);
+        } else if (r2.status === 'PLAYING') {
+          // เด้ง popup ให้ host เลือก รอต่อ/จบแมตช์
+          const hostSid = conns.get(code)?.get(r2.hostId);
+          if (hostSid) io.to(hostSid).emit('peer:graceExpired', { playerId });
+        }
       }, r.settings.graceSeconds * 1000));
     });
   });

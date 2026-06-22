@@ -49,6 +49,7 @@ export function createRoom({
     lastSummary: null,
     dealerSeat: 0,        // เจ้ามือรอบถัดไป (หมุนข้ามรอบ)
     direction: 1,         // ทิศปัจจุบัน (โง่ทำให้วนกลับ — ส่งต่อข้ามรอบ)
+    seq: 0,               // ตัวนับสร้าง id (id เสถียร ไม่จัดใหม่ตอนมีคนออก)
     genToken,
   };
   const host = joinRoom(room, { name: hostName });
@@ -61,8 +62,9 @@ export function joinRoom(room, { name } = {}) {
   if (room.status !== 'WAITING') throw new Error('เกมเริ่มแล้ว เข้าห้องไม่ได้');
   if (room.players.length >= MAX_PLAYERS) throw new Error('ห้องเต็มแล้ว (4 คน)');
   const seat = room.players.length;
+  room.seq += 1;
   const player = {
-    id: `p${seat + 1}`,
+    id: `p${room.seq}`,   // id เสถียร (ไม่เปลี่ยนแม้มีคนออก) → seat ใช้จัดลำดับแสดงผลแทน
     name: name || `ผู้เล่น ${seat + 1}`,
     seat,
     token: room.genToken(),
@@ -74,13 +76,13 @@ export function joinRoom(room, { name } = {}) {
   return player;
 }
 
-// ออกจากห้องตอนรอเริ่ม (WAITING) → ลบ + เรียง seat/id ใหม่ · host ออก → ย้าย host
+// ออกจากห้อง (เฉพาะ WAITING/FINISHED — กลางเกมห้าม) → ลบ + เรียง seat ใหม่ (id คงเดิม) · host ออก → ย้าย host
 export function leaveRoom(room, playerId) {
   if (room.status === 'PLAYING') throw new Error('ระหว่างเล่นออกไม่ได้ (ใช้หลุด/จบแมตช์แทน)');
   const idx = room.players.findIndex((p) => p.id === playerId);
   if (idx < 0) throw new Error('ไม่พบผู้เล่นในห้อง');
   room.players.splice(idx, 1);
-  room.players.forEach((p, i) => { p.seat = i; p.id = `p${i + 1}`; }); // เรียงใหม่
+  room.players.forEach((p, i) => { p.seat = i; }); // เรียง seat ใหม่ (id เสถียร ไม่แตะ)
   if (room.players.length === 0) { room.status = 'FINISHED'; return room; }
   if (!room.players.some((p) => p.id === room.hostId)) room.hostId = room.players[0].id;
   return room;
@@ -115,6 +117,7 @@ export function isGraceExpired(room, playerId, now = Date.now()) {
 export function startGame(room, { deck, rng } = {}) {
   if (room.status !== 'WAITING') throw new Error('เริ่มเกมได้เฉพาะตอนรอผู้เล่น');
   if (room.players.length !== MAX_PLAYERS) throw new Error('ต้องมีผู้เล่นครบ 4 คนก่อนเริ่ม');
+  if (room.players.some((p) => !p.connected)) throw new Error('มีผู้เล่นหลุดอยู่ — รอให้กลับมาก่อนเริ่ม');
   room.status = 'PLAYING';
   room.dealerSeat = 0;
   room.direction = 1;

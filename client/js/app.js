@@ -105,7 +105,13 @@
     }, { disabled: selected.size !== 1 }));
     if (allowed.includes('KNOCK')) add(btn('น็อค! 🏆', () => act('KNOCK', { faceDownCardId: r.yourHand[0].id }), { primary: true }));
 
-    if (!bar.children.length) hint.textContent = 'รอตาคุณ…';
+    // hint กฎ "เปิดครั้งแรกต้องเก็บกอง"
+    if (r.openedFromHand) {
+      hint.textContent = '⚠️ เปิดจากมือแล้ว — ตานี้ต้องน็อคให้ได้ (ทิ้งไม่ได้)';
+    } else if (!r.youMelded && r.phase === 'ACTION') {
+      hint.textContent = 'เปิดครั้งแรกต้องเก็บกอง/หัว — จั่วแล้วเกิดจากมือได้เฉพาะถ้าจะน็อคมืด';
+    }
+    if (!bar.children.length && !hint.textContent) hint.textContent = 'รอตาคุณ…';
   }
 
   // ---------- route จอ ----------
@@ -153,14 +159,27 @@
     sessionToken = res.token; Net.saveSession(code, res.token);
   }
 
+  // ออกจากห้อง (ได้เฉพาะตอนรอเริ่ม/จบแมตช์ — server บังคับ) → ล้าง session กลับล็อบบี้
+  async function leaveRoom() {
+    const res = await Net.emit('room:leave', {});
+    if (res && res.ok) {
+      Net.clearSession(); view = null; reset();
+      Render.showScreen('screen-lobby');
+    } else {
+      Render.toast(res?.error || 'ออกจากห้องไม่ได้');
+    }
+  }
+
   $('btn-create').onclick = createRoom;
   $('btn-join').onclick = joinRoom;
+  $('btn-leave').onclick = leaveRoom;
   $('btn-start').onclick = () => Net.emit('room:start', {}).then((r) => { if (!r.ok) Render.toast(r.error); });
 
   // ปุ่มในจอสรุป (สร้าง dynamic — ผูกด้วย delegation)
   document.addEventListener('click', (e) => {
     if (e.target.id === 'btn-next') Net.emit('round:next', {}).then((r) => { if (!r.ok) Render.toast(r.error); });
     if (e.target.id === 'btn-close') Net.emit('room:close', {}).then((r) => { if (!r.ok) Render.toast(r.error); });
+    if (e.target.id === 'btn-leave-summary') leaveRoom();
   });
   $('dc-wait').onclick = () => { $('dc-popup').classList.add('hidden'); Net.emit('peer:resolve', { decision: 'wait' }); };
   $('dc-end').onclick = () => { $('dc-popup').classList.add('hidden'); Net.emit('peer:resolve', { decision: 'end' }); };

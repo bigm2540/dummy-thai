@@ -45,16 +45,23 @@ test('joinRoom: เริ่มเกมแล้วเข้าไม่ได�
   assert.throws(() => joinRoom(room, { name: 'E' }), /เริ่มแล้ว/);
 });
 
-test('leaveRoom (WAITING): ลบ + เรียง seat/id ใหม่ + ย้าย host ถ้าจำเป็น', () => {
+test('leaveRoom (WAITING): ลบ + id เสถียร (ไม่จัดใหม่) + เรียง seat + ย้าย host', () => {
   codeN = 0; tokN = 0;
   const room = createRoom({ hostName: 'A', genCode, genToken });
   joinRoom(room, { name: 'B' });
   joinRoom(room, { name: 'C' });
   leaveRoom(room, 'p1'); // host ออก
   assert.equal(room.players.length, 2);
-  assert.deepEqual(room.players.map((p) => p.id), ['p1', 'p2']);
+  assert.deepEqual(room.players.map((p) => p.id), ['p2', 'p3']);   // id เดิม ไม่ขยับ
   assert.deepEqual(room.players.map((p) => p.name), ['B', 'C']);
-  assert.equal(room.hostId, 'p1'); // ย้าย host ไปคนแรกที่เหลือ (B)
+  assert.deepEqual(room.players.map((p) => p.seat), [0, 1]);        // seat เรียงใหม่
+  assert.equal(room.hostId, 'p2'); // ย้าย host ไปคนแรกที่เหลือ (B = p2)
+});
+
+test('startGame: มีผู้เล่นหลุด (offline) → ปฏิเสธ', () => {
+  const room = makeFullRoom();
+  markDisconnected(room, 'p3', 1000);
+  assert.throws(() => startGame(room, { rng: () => 0 }), /หลุด/);
 });
 
 test('startGame: ต้องครบ 4 คน + เริ่มรอบ (round พร้อมเล่น)', () => {

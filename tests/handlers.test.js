@@ -129,12 +129,54 @@ test('game:action ผิดตา → error (engine ปฏิเสธ)', () => 
   assert.match(bad.error, /ตาคุณ/);
 });
 
-test('disconnect ตอน WAITING → ออกจากห้อง (เหลือ 3)', () => {
-  const { io, sockets, code } = setupRoom();
+test('disconnect ตอน WAITING → mark offline (ยังอยู่), เกิน grace ค่อยเอาออก', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { io, sockets } = setupRoom();
   sockets.s4.fire('disconnect');
-  // host ยังเห็น 3 คน
-  const v = lastUpdate(io, 'sid1');
-  assert.equal(v.players.length, 3);
+  let v = lastUpdate(io, 'sid1');
+  assert.equal(v.players.length, 4);                              // ยังอยู่ครบ (ไม่ลบทันที)
+  assert.equal(v.players.find((p) => p.id === 'p4').connected, false); // แต่ offline
+  t.mock.timers.tick(60_000);                                     // เกิน grace
+  v = lastUpdate(io, 'sid1');
+  assert.equal(v.players.length, 3);                              // ค่อยถูกเอาออก
+});
+
+test('BUG fix: หลุดตอนรอ + rejoin ใน grace → ห้องไม่พัง (host กลับมา online)', (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const io = makeFakeIo();
+  createGameServer(io);
+  const s1 = io._connect('sid1'); const r = call(s1, 'room:create', { name: 'A' });
+  const code = r.code;
+  const s2 = io._connect('sid2'); call(s2, 'room:join', { code, name: 'B' });
+  // host หลุดแว้บเดียว
+  s1.fire('disconnect');
+  assert.equal(lastUpdate(io, 'sid2').players.length, 2);                                // ห้องไม่พัง
+  assert.equal(lastUpdate(io, 'sid2').players.find((p) => p.id === 'p1').connected, false);
+  // host กลับมาใน grace ด้วย token เดิม (socket ใหม่)
+  const s1b = io._connect('sid1b');
+  const re = call(s1b, 'room:rejoin', { code, token: r.token });
+  assert.equal(re.ok, true); assert.equal(re.playerId, 'p1');
+  assert.equal(lastUpdate(io, 'sid2').players.find((p) => p.id === 'p1').connected, true);
+  // grace เดิม fire → ไม่เอา host ออก (กลับมาแล้ว)
+  t.mock.timers.tick(60_000);
+  const v = lastUpdate(io, 'sid2');
+  assert.equal(v.players.length, 2);
+  assert.ok(v.players.find((p) => p.id === 'p1'));
+});
+
+test('room:leave: ออกตอนรอเริ่ม → ถูกเอาออก (เหลือ 3)', () => {
+  const { io, sockets } = setupRoom();
+  const res = call(sockets.s4, 'room:leave');
+  assert.equal(res.ok, true);
+  assert.equal(lastUpdate(io, 'sid1').players.length, 3);
+});
+
+test('room:leave: กลางเกม → ปฏิเสธ', () => {
+  const { sockets } = setupRoom();
+  call(sockets.s1, 'room:start', {});
+  const res = call(sockets.s2, 'room:leave');
+  assert.equal(res.ok, false);
+  assert.match(res.error, /กลางเกม/);
 });
 
 test('disconnect ตอน PLAYING + rejoin ด้วย token → กลับที่นั่งเดิม connected=true', () => {

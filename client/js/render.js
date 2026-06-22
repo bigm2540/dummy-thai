@@ -170,10 +170,12 @@ const Render = (() => {
     // ปุ่ม
     const acts = $('summary-actions'); acts.innerHTML = '';
     const isHost = view.you === view.hostId;
-    if (!match && isHost) {
+    if (match) {
+      acts.innerHTML = '<button id="btn-leave-summary" class="primary">ออกจากห้อง</button>';
+    } else if (isHost) {
       acts.innerHTML = `<button id="btn-next" class="primary">เริ่มรอบใหม่</button>
         <button id="btn-close" class="danger">ปิดห้อง (จบแมตช์)</button>`;
-    } else if (!match) {
+    } else {
       acts.innerHTML = '<span class="hint">รอ host เริ่มรอบใหม่…</span>';
     }
   }

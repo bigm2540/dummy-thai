@@ -25,6 +25,8 @@ export function getPlayerView(s, pid) {
     turnNo: s.turnNo,
     status: s.status,
     winnerId: s.winnerId,
+    youMelded: s.playerStates[pid]?.hasMelded ?? false,        // เปิดแล้วหรือยัง (กฎเปิดต้องเก็บกอง)
+    openedFromHand: s.playerStates[pid]?.openedFromHand ?? false, // เปิดจากมือ → ต้องน็อคตานี้
     scores: totals(s),                     // คะแนนสะสมรอบนี้ (live standings)
     moneyRate: s.config.moneyRate,
     allowedActions: allowedActions(s, pid),
