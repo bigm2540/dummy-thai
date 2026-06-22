@@ -43,6 +43,20 @@ button.primary{background:var(--gold); color:#1c1c1c; font-weight:700; border:no
 button.danger{background:#7a241b; border-color:#c0392b;}
 button:disabled{opacity:.4; cursor:not-allowed;}
 
+/* ตัวเลือกเรทเงิน (ล็อบบี้) */
+.rate-row{display:flex; flex-direction:column; gap:6px;}
+.rate-label{font-size:12px; color:var(--dim); text-align:center;}
+.rate-opts{display:flex; gap:6px;}
+.rate-opt{flex:1; padding:9px 0;}
+.rate-opt.active{background:var(--gold); color:#1c1c1c; font-weight:700; border-color:var(--gold);}
+
+/* ปุ่มดูเงิน (มุมโต๊ะ) */
+.money-btn{position:absolute; top:6px; right:8px; z-index:20; padding:6px 10px; font-size:13px;}
+
+/* drag จัดเรียงไพ่ในมือ */
+.my-hand .card{touch-action:none;}
+.card.dragging{opacity:.55; outline:2px dashed var(--gold);}
+
 .player-list{list-style:none; display:flex; flex-direction:column; gap:6px;}
 .player-list li{background:#0d1712; padding:8px 12px; border-radius:8px; display:flex; justify-content:space-between;}
 .player-list .host-badge{color:var(--gold); font-size:12px;}

@@ -20,6 +20,15 @@
     <div class="card-panel">
       <h1>🎴 ดัมมี่ไทย</h1>
       <input id="name-input" maxlength="12" placeholder="ชื่อของคุณ" />
+      <div class="rate-row">
+        <span class="rate-label">เรทเงิน (บาท/คะแนน)</span>
+        <div class="rate-opts" id="rate-opts">
+          <button type="button" class="rate-opt active" data-rate="1">1</button>
+          <button type="button" class="rate-opt" data-rate="5">5</button>
+          <button type="button" class="rate-opt" data-rate="10">10</button>
+          <button type="button" class="rate-opt" data-rate="20">20</button>
+        </div>
+      </div>
       <button id="btn-create" class="primary">สร้างห้องใหม่</button>
       <div class="divider">หรือ</div>
       <input id="code-input" maxlength="4" placeholder="รหัสห้อง (4 ตัว)" style="text-transform:uppercase" />
@@ -62,6 +71,9 @@
       <!-- ตัวเรา (ล่าง) -->
       <div class="seat seat-self" data-slot="self"></div>
 
+      <!-- ปุ่มดูเงินสะสม (ดูได้ตลอด) -->
+      <button id="btn-money" class="money-btn">💰 เงิน</button>
+
       <!-- มือเรา + แถบปุ่ม -->
       <div class="myhand-area">
         <div id="status-bar" class="status-bar"></div>
@@ -80,6 +92,15 @@
       <div id="summary-actions"></div>
     </div>
   </section>
+
+  <!-- popup: เงินสะสมของทุกคน (ดูได้ตลอด) -->
+  <div id="money-popup" class="overlay hidden">
+    <div class="card-panel">
+      <h3>💰 เงิน/คะแนนปัจจุบัน</h3>
+      <table id="money-table" class="summary-table"></table>
+      <button id="money-close" class="primary">ปิด</button>
+    </div>
+  </div>
 
   <!-- popup: host ตัดสินใจเมื่อมีคนหลุดเกิน grace -->
   <div id="dc-popup" class="overlay hidden">
