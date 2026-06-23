@@ -57,7 +57,10 @@ export function startRound({ playerIds, dealerSeat = 0, direction = 1, config = 
   const playerStates = {};
   playerIds.forEach((id, i) => {
     hands[id] = dealt.hands[i];
-    playerStates[id] = { hasMelded: false, firstMeldTurn: null, shownSpeto: false, hasPlayed: false };
+    playerStates[id] = {
+      hasMelded: false, firstMeldTurn: null, shownSpeto: false, hasPlayed: false,
+      openedFromHand: false, // เปิดครั้งแรกจากมือ (จั่วแล้วเกิด) → ต้องน็อคตานั้น ไม่งั้นผิดกติกา
+    };
   });
   return {
     playerIds,
@@ -265,8 +268,11 @@ export function meld(s, pid, cardIds) {
   if (s.hands[pid].length - cardIds.length < 1) {
     throw new Error('ต้องเหลือใบปิดอย่างน้อย 1 ใบ — ถ้าจะลงหมดให้น็อค');
   }
+  const openingFromHand = !s.playerStates[pid].hasMelded; // ครั้งแรกของคนนี้ + ลงจากมือ
   takeFromHand(s, pid, cardIds);
   const m = placeMeld(s, pid, cards);
+  // กฎ: เปิดครั้งแรกต้องเก็บกอง/หัว — เปิดจากมือได้เฉพาะถ้าจะน็อคมืดตานี้ (ตั้ง flag, บล็อกตอนทิ้ง)
+  if (openingFromHand) s.playerStates[pid].openedFromHand = true;
   applyMeldBonuses(s, pid, cards); // หัวอยู่ในกองทิ้งเสมอ → ไม่เกิดหัวจากมือ แต่เกิดสเปโตได้
   return m;
 }
@@ -318,6 +324,9 @@ function applyDiscardPenalties(s, pid, card) {
 export function discard(s, pid, cardId) {
   requireTurn(s, pid);
   requirePhase(s, 'ACTION');
+  if (s.playerStates[pid].openedFromHand) {
+    throw new Error('เปิดครั้งแรกต้องเก็บกองทิ้ง/หัว — จั่วแล้วลงจากมือได้เฉพาะถ้าน็อคมืด (ต้องน็อคตานี้)');
+  }
   if (s.hands[pid].length <= 1) {
     throw new Error('เหลือไพ่ใบเดียว — ต้องน็อค (ทิ้งใบสุดท้ายไม่ได้)');
   }
@@ -347,6 +356,7 @@ export function knock(s, pid, faceDownCardId, rng = Math.random) {
   const hand = s.hands[pid];
   if (hand.length !== 1) throw new Error('น็อคได้เมื่อเหลือไพ่ใบเดียว (ใบปิด)');
   if (hand[0].id !== faceDownCardId) throw new Error('ใบปิดไม่ตรง');
+  s.playerStates[pid].openedFromHand = false; // น็อค = เปิดจากมือถูกกติกา (น็อคมืด) แล้ว
 
   const knockType = detectKnockType(s, pid);
   const faceDown = hand[0];
@@ -435,7 +445,9 @@ export function allowedActions(s, pid) {
     if (s.lastTurn) return [...acts, 'PICK_DISCARD', 'PASS'];
     return [...acts, 'DRAW_STOCK', 'PICK_DISCARD'];
   }
-  acts.push('MELD', 'LAYOFF', 'DISCARD'); // ในตาสุดท้าย: DISCARD = ไม่น็อค → จบรอบ
+  acts.push('MELD');                                  // เกิด (เปิดครั้งแรกจากมือได้เฉพาะถ้าจะน็อคมืด)
+  if (ps.hasMelded) acts.push('LAYOFF');              // ฝากได้ต่อเมื่อเปิดแล้ว
+  if (!ps.openedFromHand) acts.push('DISCARD');       // เปิดจากมือแล้วต้องน็อค ห้ามทิ้ง
   if (s.hands[pid].length === 1) acts.push('KNOCK');
   return acts;
 }

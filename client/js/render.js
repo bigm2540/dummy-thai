@@ -136,12 +136,12 @@ const Render = (() => {
       `ช่วง <b>${r.phase === 'DRAW' ? 'จั่ว/เก็บ' : 'ลงไพ่/ทิ้ง'}</b> · คะแนนคุณ <b>${fmt(r.scores[view.you])}</b>` +
       (r.lastTurn ? ' · <b>⚠️ ตาสุดท้าย (กองหมด)</b>' : '');
 
-    // มือเรา
+    // มือเรา (เรียงตามที่ผู้เล่นจัดเอง + รองรับลากสลับ)
     const hand = $('my-hand'); hand.innerHTML = '';
-    r.yourHand.forEach((c) => {
-      const sel = ctx.selected.has(c.id);
-      const el = cardEl(c, { headId: r.headId, small: false, selectable: true, selected: sel });
-      el.onclick = () => ctx.onHandClick(c.id);
+    const ordered = ctx.orderHand ? ctx.orderHand(r.yourHand) : r.yourHand;
+    ordered.forEach((c) => {
+      const el = cardEl(c, { headId: r.headId, small: false, selectable: true, selected: ctx.selected.has(c.id) });
+      el.onpointerdown = (e) => ctx.onHandPointerDown(e, c.id, el); // ลาก=จัดเรียง / แตะ=เลือก
       hand.appendChild(el);
     });
   }
@@ -170,10 +170,13 @@ const Render = (() => {
     // ปุ่ม
     const acts = $('summary-actions'); acts.innerHTML = '';
     const isHost = view.you === view.hostId;
-    if (!match && isHost) {
+    if (match) {
+      const nm = isHost ? '<button id="btn-newmatch" class="primary">เริ่มแมตช์ใหม่</button>' : '';
+      acts.innerHTML = nm + '<button id="btn-leave-summary">ออกจากห้อง</button>';
+    } else if (isHost) {
       acts.innerHTML = `<button id="btn-next" class="primary">เริ่มรอบใหม่</button>
         <button id="btn-close" class="danger">ปิดห้อง (จบแมตช์)</button>`;
-    } else if (!match) {
+    } else {
       acts.innerHTML = '<span class="hint">รอ host เริ่มรอบใหม่…</span>';
     }
   }

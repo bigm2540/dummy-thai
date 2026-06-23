@@ -218,12 +218,67 @@ test('layoff สเปโต ไม่ยิง SPETO_MELD (ต้องเป�
   assert.ok(s.events.some((e) => e.type === 'SPETO_LAYOFF_SELF'));
 });
 
+test('กฎเปิด: จั่วแล้วเกิดจากมือ (เปิดครั้งแรก) → ทิ้งไม่ได้ (ต้องน็อค)', () => {
+  const s = startRound({ playerIds: P });
+  drawStock(s, 'A');
+  s.hands.A = cs('S7', 'H7', 'D7', 'SK', 'S9'); // ยังไม่เคยเปิด
+  meld(s, 'A', ['S7', 'H7', 'D7']);             // เปิดจากมือ
+  assert.equal(s.playerStates.A.openedFromHand, true);
+  assert.ok(!allowedActions(s, 'A').includes('DISCARD')); // ห้ามทิ้ง
+  assert.throws(() => discard(s, 'A', 'SK'), /เปิดครั้งแรกต้องเก็บกอง/);
+});
+
+test('กฎเปิด: เปิดด้วยเก็บกอง → ทิ้งได้ปกติ (ไม่ติด flag)', () => {
+  const s = startRound({ playerIds: P });
+  s.headId = 'X0'; s.phase = 'DRAW'; s.currentSeat = 0;
+  s.discard = cs('S9');
+  s.hands.A = cs('H9', 'D9', 'SK', 'S2', 'S3');
+  pickDiscard(s, 'A', 0, { meldCardIds: ['H9', 'D9'] }); // เปิดด้วยเก็บกอง S9
+  assert.equal(s.playerStates.A.hasMelded, true);
+  assert.equal(s.playerStates.A.openedFromHand, false);  // เปิดถูกทาง
+  assert.ok(allowedActions(s, 'A').includes('DISCARD'));
+  discard(s, 'A', 'SK');                                  // ทิ้งได้
+  assert.equal(s.currentSeat, 1);
+});
+
+test('กฎเปิด: เปิดแล้ว (เก็บกอง) ตาต่อไปจั่วแล้วเกิดจากมือ + ทิ้งได้', () => {
+  const s = startRound({ playerIds: P });
+  s.phase = 'ACTION'; s.currentSeat = 0;
+  s.playerStates.A = { hasMelded: true, firstMeldTurn: 1, shownSpeto: false, hasPlayed: true, openedFromHand: false };
+  s.hands.A = cs('S7', 'H7', 'D7', 'SK', 'S9');
+  meld(s, 'A', ['S7', 'H7', 'D7']);             // เปิดแล้ว → เกิดจากมือได้ ไม่ติด flag
+  assert.equal(s.playerStates.A.openedFromHand, false);
+  discard(s, 'A', 'SK');                          // ทิ้งได้
+  assert.equal(s.currentSeat, 1);
+});
+
+test('กฎเปิด: น็อคมืดจากมือ (จั่ว→ลงหมด→น็อค) ทำได้', () => {
+  const s = startRound({ playerIds: P });
+  s.phase = 'ACTION'; s.currentSeat = 0; s.turnNo = 6; s.headId = 'X0';
+  // A ยังไม่เคยเปิด → เกิด 2 ชุดจากมือ เหลือใบปิด 1 แล้วน็อค (น็อคมืด)
+  s.hands.A = cs('S4', 'S5', 'S6', 'H7', 'D7', 'C7', 'SK');
+  meld(s, 'A', ['S4', 'S5', 'S6']);             // เปิดจากมือ → openedFromHand
+  assert.equal(s.playerStates.A.openedFromHand, true);
+  meld(s, 'A', ['H7', 'D7', 'C7']);             // ลงต่อ เหลือ SK
+  assert.equal(s.hands.A.length, 1);
+  ['B', 'C', 'D'].forEach((id) => { s.hands[id] = cs('H3'); s.playerStates[id] = { hasMelded: false, firstMeldTurn: null }; });
+  knock(s, 'A', 'SK', () => 0);                   // น็อคมืด → legit
+  assert.equal(s.status, 'ENDED');
+  assert.equal(s.playerStates.A.openedFromHand, false); // ปลดล็อกแล้ว
+  const ev = s.events.find((e) => e.type === 'KNOCK');
+  assert.match(ev.note, /dark/);                  // เป็นน็อคมืด
+  assert.ok(isZeroSum(totals(s)));
+});
+
 test('allowedActions: ตามช่วง + เฉพาะตาตัวเอง', () => {
   const s = startRound({ playerIds: P });
   assert.deepEqual(allowedActions(s, 'A'), ['DRAW_STOCK', 'PICK_DISCARD']);
   assert.deepEqual(allowedActions(s, 'B'), []); // ไม่ใช่ตา B
   drawStock(s, 'A');
-  assert.deepEqual(allowedActions(s, 'A'), ['MELD', 'LAYOFF', 'DISCARD']);
+  // ยังไม่เปิด → ยังไม่มี LAYOFF (ฝากได้ต่อเมื่อเปิดแล้ว)
+  assert.deepEqual(allowedActions(s, 'A'), ['MELD', 'DISCARD']);
+  s.playerStates.A.hasMelded = true; // เปิดแล้ว → ฝากได้
+  assert.ok(allowedActions(s, 'A').includes('LAYOFF'));
   s.hands.A = cs('SK'); // เหลือ 1 ใบ → น็อคได้
   assert.ok(allowedActions(s, 'A').includes('KNOCK'));
 });

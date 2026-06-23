@@ -7,8 +7,20 @@
   let mode = 'idle';          // idle | pick | pickPlan | pickLayoff | layoff
   let pickTarget = null;      // index ใบเป้าหมายในกองทิ้ง
   let layoffCardId = null;    // ไพ่ที่จะฝาก (โหมด layoff)
+  let handOrder = [];         // ลำดับไพ่ในมือที่ผู้เล่นจัดเอง (ลากสลับ — client เท่านั้น)
+  let drag = null;            // สถานะลากไพ่
+  let selectedRate = 1;       // เรทเงินที่เลือกตอนสร้างห้อง
 
   function reset() { selected.clear(); mode = 'idle'; pickTarget = null; layoffCardId = null; }
+
+  // เรียงไพ่ในมือตามที่ผู้เล่นจัด (ไพ่ใหม่ต่อท้าย, ไพ่ที่หายเอาออก)
+  function orderHand(cards) {
+    const ids = cards.map((c) => c.id);
+    handOrder = handOrder.filter((id) => ids.includes(id));
+    for (const id of ids) if (!handOrder.includes(id)) handOrder.push(id);
+    const byId = Object.fromEntries(cards.map((c) => [c.id, c]));
+    return handOrder.map((id) => byId[id]);
+  }
 
   // ---------- ส่ง action ----------
   async function act(type, payload) {
@@ -25,14 +37,49 @@
       selected, mode, pickTarget,
       meldTargetable: mode === 'layoff' || mode === 'pickLayoff',
       onHandClick,
+      onHandPointerDown,
       onDiscardClick,
       onMeldClick,
+      orderHand,
     };
   }
 
   function onHandClick(id) {
     if (mode !== 'idle' && mode !== 'pickPlan') return;
     if (selected.has(id)) selected.delete(id); else selected.add(id);
+    draw();
+  }
+
+  // ลากสลับไพ่ในมือ (pointer = mouse+touch); แตะสั้น = เลือก, ลาก = จัดเรียง
+  function onHandPointerDown(e, id, el) {
+    drag = { id, el, startX: e.clientX, moved: false };
+    try { el.setPointerCapture(e.pointerId); } catch { /* */ }
+    el.onpointermove = onHandPointerMove;
+    el.onpointerup = onHandPointerUp;
+    el.onpointercancel = onHandPointerUp;
+  }
+  function onHandPointerMove(e) {
+    if (!drag) return;
+    if (!drag.moved && Math.abs(e.clientX - drag.startX) > 8) {
+      drag.moved = true; drag.el.classList.add('dragging');
+    }
+  }
+  function onHandPointerUp(e) {
+    if (!drag) return;
+    const d = drag; drag = null;
+    d.el.onpointermove = d.el.onpointerup = d.el.onpointercancel = null;
+    d.el.classList.remove('dragging');
+    if (!d.moved) { onHandClick(d.id); return; }   // แตะเฉยๆ = เลือก
+    // ลาก → หาตำแหน่งปลายทางจาก x แล้วย้าย id ใน handOrder
+    const cards = [...document.querySelectorAll('#my-hand .card')];
+    let idx = cards.length - 1;
+    for (let i = 0; i < cards.length; i++) {
+      const r = cards[i].getBoundingClientRect();
+      if (e.clientX < r.left + r.width / 2) { idx = i; break; }
+    }
+    const cur = handOrder.filter((x) => x !== d.id);
+    cur.splice(Math.min(idx, cur.length), 0, d.id);
+    handOrder = cur;
     draw();
   }
   function onDiscardClick(i) {
@@ -105,7 +152,13 @@
     }, { disabled: selected.size !== 1 }));
     if (allowed.includes('KNOCK')) add(btn('น็อค! 🏆', () => act('KNOCK', { faceDownCardId: r.yourHand[0].id }), { primary: true }));
 
-    if (!bar.children.length) hint.textContent = 'รอตาคุณ…';
+    // hint กฎ "เปิดครั้งแรกต้องเก็บกอง"
+    if (r.openedFromHand) {
+      hint.textContent = '⚠️ เปิดจากมือแล้ว — ตานี้ต้องน็อคให้ได้ (ทิ้งไม่ได้)';
+    } else if (!r.youMelded && r.phase === 'ACTION') {
+      hint.textContent = 'เปิดครั้งแรกต้องเก็บกอง/หัว — จั่วแล้วเกิดจากมือได้เฉพาะถ้าจะน็อคมืด';
+    }
+    if (!bar.children.length && !hint.textContent) hint.textContent = 'รอตาคุณ…';
   }
 
   // ---------- route จอ ----------
@@ -140,7 +193,7 @@
   let sessionToken = null;
   async function createRoom() {
     const name = $('name-input').value.trim() || 'ผู้เล่น';
-    const res = await Net.emit('room:create', { name });
+    const res = await Net.emit('room:create', { name, moneyRate: selectedRate });
     if (!res.ok) return Render.toast(res.error);
     sessionToken = res.token; Net.saveSession(res.code, res.token);
   }
@@ -153,14 +206,50 @@
     sessionToken = res.token; Net.saveSession(code, res.token);
   }
 
+  // ออกจากห้อง (ได้เฉพาะตอนรอเริ่ม/จบแมตช์ — server บังคับ) → ล้าง session กลับล็อบบี้
+  async function leaveRoom() {
+    const res = await Net.emit('room:leave', {});
+    if (res && res.ok) {
+      Net.clearSession(); view = null; reset();
+      Render.showScreen('screen-lobby');
+    } else {
+      Render.toast(res?.error || 'ออกจากห้องไม่ได้');
+    }
+  }
+
+  // เลือกเรทเงิน (ล็อบบี้)
+  $('rate-opts').addEventListener('click', (e) => {
+    const b = e.target.closest('.rate-opt'); if (!b) return;
+    selectedRate = Number(b.dataset.rate);
+    [...document.querySelectorAll('.rate-opt')].forEach((x) => x.classList.toggle('active', x === b));
+  });
+
+  // ดูเงิน/คะแนนสะสม (รวมรอบสด) ได้ตลอด
+  function openMoney() {
+    if (!view) return;
+    const r = view.round; const rate = view.moneyRate || 1;
+    $('money-table').innerHTML = '<tr><th>ผู้เล่น</th><th>คะแนน (รวมรอบสด)</th><th>เงิน</th></tr>' +
+      view.players.map((p) => {
+        const total = (p.totalScore || 0) + ((r && r.scores[p.id]) || 0);
+        return `<tr><td>${p.name}</td><td class="${total>0?'pos':total<0?'neg':''}">${total>0?'+':''}${total}</td>` +
+          `<td>${total * rate}฿</td></tr>`;
+      }).join('');
+    $('money-popup').classList.remove('hidden');
+  }
+  $('btn-money').onclick = openMoney;
+  $('money-close').onclick = () => $('money-popup').classList.add('hidden');
+
   $('btn-create').onclick = createRoom;
   $('btn-join').onclick = joinRoom;
+  $('btn-leave').onclick = leaveRoom;
   $('btn-start').onclick = () => Net.emit('room:start', {}).then((r) => { if (!r.ok) Render.toast(r.error); });
 
   // ปุ่มในจอสรุป (สร้าง dynamic — ผูกด้วย delegation)
   document.addEventListener('click', (e) => {
     if (e.target.id === 'btn-next') Net.emit('round:next', {}).then((r) => { if (!r.ok) Render.toast(r.error); });
     if (e.target.id === 'btn-close') Net.emit('room:close', {}).then((r) => { if (!r.ok) Render.toast(r.error); });
+    if (e.target.id === 'btn-leave-summary') leaveRoom();
+    if (e.target.id === 'btn-newmatch') Net.emit('room:newMatch', {}).then((r) => { if (!r.ok) Render.toast(r.error); });
   });
   $('dc-wait').onclick = () => { $('dc-popup').classList.add('hidden'); Net.emit('peer:resolve', { decision: 'wait' }); };
   $('dc-end').onclick = () => { $('dc-popup').classList.add('hidden'); Net.emit('peer:resolve', { decision: 'end' }); };

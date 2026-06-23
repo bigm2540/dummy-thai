@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createRoom, joinRoom, leaveRoom, startGame, startNextRound, applyAction,
-  markDisconnected, rejoinByToken, isGraceExpired, closeRoom, getRoomView,
+  markDisconnected, rejoinByToken, isGraceExpired, closeRoom, newMatch, getRoomView,
   playerById, MAX_PLAYERS,
 } from '../server/room/roomManager.js';
 import { isZeroSum } from '../server/game/scoring.js';
@@ -45,16 +45,23 @@ test('joinRoom: เริ่มเกมแล้วเข้าไม่ได�
   assert.throws(() => joinRoom(room, { name: 'E' }), /เริ่มแล้ว/);
 });
 
-test('leaveRoom (WAITING): ลบ + เรียง seat/id ใหม่ + ย้าย host ถ้าจำเป็น', () => {
+test('leaveRoom (WAITING): ลบ + id เสถียร (ไม่จัดใหม่) + เรียง seat + ย้าย host', () => {
   codeN = 0; tokN = 0;
   const room = createRoom({ hostName: 'A', genCode, genToken });
   joinRoom(room, { name: 'B' });
   joinRoom(room, { name: 'C' });
   leaveRoom(room, 'p1'); // host ออก
   assert.equal(room.players.length, 2);
-  assert.deepEqual(room.players.map((p) => p.id), ['p1', 'p2']);
+  assert.deepEqual(room.players.map((p) => p.id), ['p2', 'p3']);   // id เดิม ไม่ขยับ
   assert.deepEqual(room.players.map((p) => p.name), ['B', 'C']);
-  assert.equal(room.hostId, 'p1'); // ย้าย host ไปคนแรกที่เหลือ (B)
+  assert.deepEqual(room.players.map((p) => p.seat), [0, 1]);        // seat เรียงใหม่
+  assert.equal(room.hostId, 'p2'); // ย้าย host ไปคนแรกที่เหลือ (B = p2)
+});
+
+test('startGame: มีผู้เล่นหลุด (offline) → ปฏิเสธ', () => {
+  const room = makeFullRoom();
+  markDisconnected(room, 'p3', 1000);
+  assert.throws(() => startGame(room, { rng: () => 0 }), /หลุด/);
 });
 
 test('startGame: ต้องครบ 4 คน + เริ่มรอบ (round พร้อมเล่น)', () => {
@@ -168,4 +175,32 @@ test('closeRoom: FINISHED + สรุปเงินรวม (= total × rate)'
   assert.equal(room.status, 'FINISHED');
   const f = getRoomView(room, 'p1').finalSummary;
   assert.equal(f.find((x) => x.playerId === 'p1').money, 10 * room.config.moneyRate);
+});
+
+test('createRoom: ตั้งเรทเงิน (moneyRate) → config + เงินสรุปใช้เรทนั้น', () => {
+  codeN = 0; tokN = 0;
+  const room = createRoom({ hostName: 'A', moneyRate: 5, genCode, genToken });
+  assert.equal(room.config.moneyRate, 5);
+  room.players[0].totalScore = 4;
+  closeRoom(room);
+  assert.equal(room.finalSummary[0].money, 20); // 4 × 5
+});
+
+test('newMatch: จบแมตช์แล้วเริ่มใหม่ → รีเซ็ตคะแนน กลับ WAITING + เริ่มได้อีก', () => {
+  const room = makeFullRoom();
+  startGame(room, { rng: () => 0 });
+  room.players[0].totalScore = 10; room.players[1].totalScore = -10;
+  closeRoom(room);
+  newMatch(room);
+  assert.equal(room.status, 'WAITING');
+  assert.ok(room.players.every((p) => p.totalScore === 0));
+  assert.equal(room.round, null);
+  assert.equal(room.dealerSeat, 0);
+  startGame(room, { rng: () => 0 });          // เริ่มแมตช์ใหม่ได้
+  assert.equal(room.status, 'PLAYING');
+});
+
+test('newMatch: ยังไม่จบแมตช์ → ปฏิเสธ', () => {
+  const room = makeFullRoom();
+  assert.throws(() => newMatch(room), /จบแมตช์/);
 });
