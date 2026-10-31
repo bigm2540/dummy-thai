@@ -60,26 +60,33 @@
   }
   function onHandPointerMove(e) {
     if (!drag) return;
-    if (!drag.moved && Math.abs(e.clientX - drag.startX) > 8) {
+    if (!drag.moved && Math.abs(e.clientX - drag.startX) > 5) {
       drag.moved = true; drag.el.classList.add('dragging');
     }
+    if (!drag.moved) return;
+    // สลับช่องสดๆ ตามตำแหน่งนิ้ว (insertBefore ใน DOM — draw() ยังไม่ถูกเรียกระหว่างลาก)
+    const hand = document.getElementById('my-hand');
+    const cards = [...hand.querySelectorAll('.card')];
+    let ref = null;
+    for (const c of cards) {
+      if (c === drag.el) continue;
+      const r = c.getBoundingClientRect();
+      if (e.clientX < r.left + r.width / 2) { ref = c; break; }
+    }
+    if (ref !== drag.el) hand.insertBefore(drag.el, ref);
+    // ไพ่ลอยตามนิ้ว (ยกขึ้น + ขยายนิด)
+    const rc = drag.el.getBoundingClientRect();
+    drag.el.style.transform = `translate(${e.clientX - (rc.left + rc.width / 2)}px,-18px) scale(1.07)`;
   }
-  function onHandPointerUp(e) {
+  function onHandPointerUp() {
     if (!drag) return;
     const d = drag; drag = null;
     d.el.onpointermove = d.el.onpointerup = d.el.onpointercancel = null;
     d.el.classList.remove('dragging');
-    if (!d.moved) { onHandClick(d.id); return; }   // แตะเฉยๆ = เลือก
-    // ลาก → หาตำแหน่งปลายทางจาก x แล้วย้าย id ใน handOrder
-    const cards = [...document.querySelectorAll('#my-hand .card')];
-    let idx = cards.length - 1;
-    for (let i = 0; i < cards.length; i++) {
-      const r = cards[i].getBoundingClientRect();
-      if (e.clientX < r.left + r.width / 2) { idx = i; break; }
-    }
-    const cur = handOrder.filter((x) => x !== d.id);
-    cur.splice(Math.min(idx, cur.length), 0, d.id);
-    handOrder = cur;
+    d.el.style.transform = '';                      // สแน็ปกลับเข้าช่องนุ่มๆ
+    if (!d.moved) { onHandClick(d.id); return; }    // แตะเฉยๆ = เลือก
+    // commit ลำดับใหม่จาก DOM → handOrder
+    handOrder = [...document.querySelectorAll('#my-hand .card')].map((c) => c.dataset.id);
     draw();
   }
   function onDiscardClick(i) {
