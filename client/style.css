@@ -1,11 +1,13 @@
 /* ===== ธีม + พื้นฐาน ===== */
 :root{
-  --felt:#0b6b3a; --felt-dark:#084d2a; --wood:#6b3f1d; --gold:#d4af37;
+  --felt:#0b6b3a; --felt-dark:#084d2a; --wood:#6b3f1d; --gold:#d4af37; --gold-dk:#b8902f; --rail:#7a1f2b;
   --card-bg:#fdfaf2; --red:#c0392b; --black:#1c1c1c;
   --panel:#13241b; --text:#f3efe0; --dim:#9fb3a6;
-  /* ขนาดไพ่ย่อ-ขยายตามความสูงจอ → พอดีจอเดียวทั้งคอม+มือถือ ไม่ต้องเลื่อน */
-  --card-h: clamp(40px, 8.4vh, 64px);  --card-w: calc(var(--card-h) * 0.7);
-  --sm-h:   clamp(28px, 5.8vh, 44px);  --sm-w:   calc(var(--sm-h) * 0.7);
+  /* ไพ่มือ(ใหญ่ กดง่าย) · ไพ่เกิด(กลาง อ่านง่าย) · ไพ่จิ๋ว(กองทิ้ง) · แถบไพ่มือ */
+  --hand-h: clamp(46px, 12vh, 76px); --hand-w: calc(var(--hand-h) * 0.7);
+  --meld-h: clamp(34px, 7.4vh, 52px); --meld-w: calc(var(--meld-h) * 0.7);
+  --mini-h: clamp(28px, 6vh, 44px);  --mini-w: calc(var(--mini-h) * 0.7);
+  --tray-h: calc(var(--hand-h) + 34px);
 }
 *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
 html,body{height:100%;}
@@ -50,95 +52,102 @@ button:disabled{opacity:.4; cursor:not-allowed;}
 .rate-opt{flex:1; padding:9px 0;}
 .rate-opt.active{background:var(--gold); color:#1c1c1c; font-weight:700; border-color:var(--gold);}
 
-/* ปุ่มดูเงิน (มุมโต๊ะ) */
-.money-btn{position:absolute; top:6px; right:8px; z-index:20; padding:6px 10px; font-size:13px;}
+/* ปุ่มดูเงิน (มุมแถบไพ่มือ) */
+.money-btn{position:absolute; top:5px; right:8px; z-index:6; padding:5px 11px; font-size:12px; background:var(--gold); color:#1c1c1c; border:none; border-radius:8px; font-weight:700;}
 
-/* drag จัดเรียงไพ่ในมือ */
-.my-hand .card{touch-action:none;}
-.card.dragging{opacity:.55; outline:2px dashed var(--gold);}
+/* drag จัดเรียงไพ่ในมือ (ลอยตามนิ้ว + สแน็ปกลับช่อง) */
+.my-hand .card{touch-action:none; transition:transform .13s ease;}
+.card.dragging{outline:2px dashed var(--gold); z-index:5; transition:none; box-shadow:0 12px 22px rgba(0,0,0,.55);}
 
 .player-list{list-style:none; display:flex; flex-direction:column; gap:6px;}
 .player-list li{background:#0d1712; padding:8px 12px; border-radius:8px; display:flex; justify-content:space-between;}
 .player-list .host-badge{color:var(--gold); font-size:12px;}
 .player-list .off{color:var(--dim); font-style:italic;}
 
-/* ===== โต๊ะ ===== */
+/* ===== โต๊ะ (ผู้เล่นรอบโต๊ะ · โซนเกิดกินทั้งกระดาน · ไพ่มือล็อกล่าง · ปุ่มลอย) ===== */
 .table-grid{
-  position:absolute; inset:0;
-  display:grid; gap:6px; padding:8px;
-  grid-template-columns: clamp(78px, 16vw, 150px) 1fr clamp(78px, 16vw, 150px);
-  grid-template-rows: auto 1fr auto;
+  position:absolute; inset:0; display:flex; flex-direction:column;
+  padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0);
+}
+/* ★ กระดาน flex:1 + min-height:0 → โซนหด/สกรอลล์เอง ไม่ดันปุ่มตกจอ */
+.board{
+  flex:1 1 auto; min-height:0; display:grid; gap:6px; padding:8px 8px 4px;
+  grid-template-columns:minmax(120px,1.05fr) 1.3fr minmax(120px,1.05fr);
+  grid-template-rows:minmax(0,1fr) minmax(0,1.15fr) minmax(0,1fr);
   grid-template-areas:
-    "top   top    top"
-    "left  center right"
-    "self  self   self";
+    "top    top    top"
+    "left   center right"
+    "mine   mine   mine";
 }
-.seat{
-  background:linear-gradient(160deg,#16291e,#0d1c14); border:1px solid #2c3f33;
-  border-radius:12px; padding:8px 10px; font-size:12px;
-  display:flex; flex-direction:column; gap:5px; align-self:start;
-}
-.seat-top{grid-area:top; flex-direction:row; align-items:center; gap:12px; flex-wrap:wrap; justify-content:center;}
-.seat-left{grid-area:left;} .seat-right{grid-area:right;}
-.seat-self{grid-area:self; display:none;}
-.seat.active{border-color:var(--gold); box-shadow:0 0 0 2px var(--gold),0 0 16px rgba(212,175,55,.6);}
-.seat .nm{font-weight:700; display:flex; align-items:center; gap:6px;}
-.seat .nm .dot{width:8px; height:8px; border-radius:50%; background:#3fae6a; flex:0 0 auto;}
-.seat .nm .dot.off{background:#c0392b;}
-.seat .nm .sc{margin-left:auto; color:var(--gold); font-variant-numeric:tabular-nums;}
-.seat .turn-tag{font-size:10px; color:#1c1c1c; background:var(--gold); padding:1px 6px; border-radius:8px; font-weight:700;}
-.seat .backs{display:flex; flex-wrap:wrap;}
-.seat .backs .card-back{margin-left:calc(var(--sm-w) * -0.5);}
-.seat .backs .card-back:first-child{margin-left:0;}
-.seat .melds{display:flex; flex-wrap:wrap; gap:4px;}
-.seat-top .col{display:flex; flex-direction:column; gap:5px;}
+.seat-top{grid-area:top;} .seat-left{grid-area:left;} .seat-right{grid-area:right;}
+.seat-self{grid-area:mine;} .center{grid-area:center;}
 
-/* ไพ่หลังคว่ำ */
-.card-back{
-  width:var(--sm-w); height:var(--sm-h); flex:0 0 auto; border-radius:5px;
-  background:repeating-linear-gradient(45deg,#7a1f2b,#7a1f2b 4px,#9c2c3a 4px,#9c2c3a 8px);
-  border:1px solid var(--gold); box-shadow:inset 0 0 0 2px rgba(212,175,55,.25);
-}
-.card-back.lg{width:var(--card-w); height:var(--card-h);}
+/* โซนผู้เล่น (หัว + ไพ่ที่เกิด) */
+.pzone{display:flex; flex-direction:column; background:linear-gradient(160deg,#16291e,#0d1c14); border:1px solid #2c3f33; border-radius:12px; min-height:0; overflow:hidden;}
+.pzone.active{border-color:var(--gold); box-shadow:0 0 0 1px var(--gold),0 0 16px rgba(212,175,55,.45);}
+.zone-head{display:flex; align-items:center; gap:8px; padding:5px 8px; flex:0 0 auto; border-bottom:1px solid #223d30;}
+.avatar{width:32px; height:32px; flex:0 0 auto; border-radius:9px; background:radial-gradient(circle at 40% 30%,#f6d98a,#caa13c); border:2px solid var(--gold-dk); color:#241a05; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:15px;}
+.avatar.off{filter:grayscale(1) brightness(.7);}
+.zone-head .who{display:flex; flex-direction:column; min-width:0;}
+.zone-head .nm{font-weight:700; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.zone-head .sc{color:var(--gold); font-size:11px; font-variant-numeric:tabular-nums;}
+.zone-head .cnt{margin-left:auto; flex:0 0 auto; font-size:10px; color:var(--dim);}
+.zone-head .cnt .pill{background:var(--rail); color:#fff; border-radius:6px; padding:1px 6px; font-weight:700;}
+.zone-head .turn-tag{flex:0 0 auto; font-size:9px; color:#1c1c1c; background:var(--gold); padding:1px 5px; border-radius:7px; font-weight:700;}
+.zone-head .host-badge{color:var(--gold); font-size:10px;}
+/* พื้นที่ไพ่เกิด = สกรอลล์ได้เอง ไม่ดันอะไร */
+.melds{flex:1 1 auto; min-height:0; overflow:auto; padding:6px; display:flex; flex-wrap:wrap; gap:5px; align-content:flex-start;}
+.seat-self .melds{align-items:center;}
+.pzone.empty .melds::after{content:"ยังไม่เปิด"; color:var(--dim); font-size:11px; opacity:.55;}
 
-.center{grid-area:center; display:flex; align-items:center; justify-content:center; gap:20px; flex-wrap:wrap;}
-.stock{display:flex; flex-direction:column; align-items:center; gap:4px;}
+/* กลางโต๊ะ: กองจั่ว + กองทิ้ง */
+.center{display:flex; align-items:center; justify-content:center; min-height:0;}
+.rail{display:flex; align-items:center; gap:14px; background:rgba(122,31,43,.26); border:1px solid #5a2630; border-radius:12px; padding:8px 12px; max-width:100%;}
+.stock{display:flex; flex-direction:column; align-items:center; gap:4px; flex:0 0 auto;}
 .stock .card-back{cursor:default;}
-.stock-count{font-size:12px; color:var(--dim);}
-.discard-wrap{max-width:60%; background:rgba(0,0,0,.2); border-radius:10px; padding:8px;}
-.discard-label{font-size:11px; color:var(--dim); margin-bottom:4px; text-align:center;}
-.discard-pile{display:flex; gap:3px; overflow-x:auto; padding-bottom:4px; max-width:100%; min-height:48px; align-items:center;}
-.discard-pile .card.dug{outline:2px solid #6ee7a0;} /* ไพ่ที่จะขุด */
+.stock-count{font-size:10px; color:var(--dim);}
+.discard-wrap{display:flex; flex-direction:column; min-width:0;}
+.discard-label{font-size:10px; color:var(--dim); margin-bottom:4px;}
+.discard-pile{display:flex; gap:4px; overflow-x:auto; align-items:center; min-height:var(--mini-h); padding-bottom:3px;}
+.discard-pile .card.dug{outline:2px solid #6ee7a0;}      /* ไพ่ที่จะขุด */
 .discard-pile .card.target{outline:3px solid var(--gold); transform:translateY(-4px);}
 
+/* ไพ่หลังคว่ำ (กองจั่ว) */
+.card-back{width:var(--meld-w); height:var(--meld-h); flex:0 0 auto; border-radius:6px; background:repeating-linear-gradient(45deg,#7a1f2b,#7a1f2b 5px,#9c2c3a 5px,#9c2c3a 10px); border:1.5px solid var(--gold); box-shadow:inset 0 0 0 2px rgba(212,175,55,.25);}
+.card-back.lg{width:var(--meld-w); height:var(--meld-h);}
+
 /* ===== ไพ่ ===== */
-.card{
-  width:var(--card-w); height:var(--card-h); flex:0 0 auto; background:linear-gradient(160deg,#fff,#f1ead4); color:var(--black);
-  border-radius:6px; border:1px solid #00000033; position:relative; cursor:default;
-  display:flex; flex-direction:column; justify-content:space-between; padding:3px 4px; font-weight:700;
-  box-shadow:0 1px 3px rgba(0,0,0,.35);
-}
-.card.sm{width:var(--sm-w); height:var(--sm-h); padding:2px 3px;}
+.card{width:var(--meld-w); height:var(--meld-h); flex:0 0 auto; background:linear-gradient(160deg,#fff,#f1ead4); color:var(--black); border-radius:6px; border:1px solid #00000033; position:relative; cursor:default; display:flex; flex-direction:column; justify-content:space-between; padding:3px 4px; font-weight:800; box-shadow:0 1px 3px rgba(0,0,0,.35);}
+.card .rk{font-size:calc(var(--meld-h)*0.3); line-height:1;}
+.card .st{font-size:calc(var(--meld-h)*0.3); align-self:flex-end; line-height:1;}
 .card.red{color:var(--red);}
-.card .rk{font-size:calc(var(--card-h) * 0.26); line-height:1;}
-.card .st{font-size:calc(var(--card-h) * 0.26); align-self:flex-end; line-height:1;}
-.card.sm .rk,.card.sm .st{font-size:calc(var(--sm-h) * 0.3);}
+/* ไพ่ในมือ = ใบใหญ่สุด กดง่าย */
+.my-hand .card{width:var(--hand-w); height:var(--hand-h); padding:4px 5px; border-radius:7px;}
+.my-hand .card .rk,.my-hand .card .st{font-size:calc(var(--hand-h)*0.27);}
+/* ไพ่ในกองทิ้ง = ใบจิ๋ว */
+.discard-pile .card{width:var(--mini-w); height:var(--mini-h);}
+.discard-pile .card .rk,.discard-pile .card .st{font-size:calc(var(--mini-h)*0.32);}
 .card.speto{border:2px solid var(--gold); box-shadow:0 0 6px var(--gold);}
 .card.speto::after{content:"★"; position:absolute; top:1px; right:3px; color:var(--gold); font-size:9px;}
 .card.head::before{content:"♛"; position:absolute; top:1px; left:3px; color:var(--gold); font-size:10px;}
 .card.selectable{cursor:pointer;}
-.card.selected{transform:translateY(-10px); outline:2px solid var(--gold);}
+.card.selected{transform:translateY(-12px); outline:2px solid var(--gold); box-shadow:0 6px 12px rgba(0,0,0,.4);}
 .card.targetable{cursor:pointer; outline:2px dashed #fff;}
 
-/* ===== มือเรา + ปุ่ม ===== */
-.myhand-area{grid-area:self; display:flex; flex-direction:column; gap:3px; align-items:center; padding-bottom:2px;}
-.status-bar{font-size:clamp(10px,1.6vh,12px); color:var(--dim); display:flex; gap:10px; flex-wrap:wrap; justify-content:center;}
+/* ===== แถบไพ่มือ (บาง · ล็อกล่างจอ) ===== */
+.tray{flex:0 0 var(--tray-h); position:relative; background:linear-gradient(180deg,#2a1a0d,#3f2813); border-top:3px solid var(--gold-dk); box-shadow:0 -6px 20px rgba(0,0,0,.5); display:flex; flex-direction:column; padding:4px 10px 8px;}
+.status-bar{font-size:clamp(10px,1.6vh,12px); color:var(--dim); display:flex; gap:10px; flex-wrap:wrap; align-items:center; padding-right:92px; min-height:16px;}
 .status-bar b{color:var(--gold);}
-.my-hand{display:flex; gap:3px; overflow-x:auto; padding:6px 4px 2px; max-width:100%; min-height:calc(var(--card-h) + 12px); align-items:flex-end;}
-.action-bar{display:flex; gap:6px; flex-wrap:wrap; justify-content:center; min-height:34px;}
-.action-bar button{padding:7px 12px;}
-.hint-bar{font-size:clamp(10px,1.6vh,12px); color:var(--gold); min-height:15px; text-align:center;}
-.meld-box{display:flex; gap:1px; padding:2px; border-radius:4px; background:rgba(255,255,255,.06);}
+.my-hand{display:flex; gap:4px; overflow-x:auto; align-items:center; flex:1 1 auto; min-height:calc(var(--hand-h) + 8px); padding:4px 2px 0;}
+
+/* ===== แถบปุ่ม (ลอยกลาง อยู่ในโฟลว์ระหว่างกระดานกับไพ่มือ) ===== */
+.action-float{flex:0 0 auto; display:flex; flex-direction:column; align-items:center; gap:5px; padding:2px 8px 4px; z-index:30; pointer-events:none; max-width:100%;}
+.hint-bar{pointer-events:none; font-size:12px; color:#241a05; background:var(--gold); border-radius:999px; padding:3px 12px; text-align:center; box-shadow:0 2px 8px rgba(0,0,0,.4);}
+.hint-bar:empty{display:none;}
+.action-bar{pointer-events:auto; display:flex; gap:6px; justify-content:center; flex-wrap:wrap; background:rgba(10,20,14,.85); border:1px solid var(--gold-dk); border-radius:14px; padding:7px 10px; box-shadow:0 6px 22px rgba(0,0,0,.55);}
+.action-bar:empty{display:none;}
+.action-bar button{padding:8px 15px; border-radius:10px;}
+.meld-box{display:flex; gap:1px; padding:2px; border-radius:4px; background:rgba(255,255,255,.08);}
 .meld-box.layoff-target{outline:2px dashed var(--gold); cursor:pointer;}
 
 /* ===== สรุป ===== */
@@ -155,7 +164,21 @@ button:disabled{opacity:.4; cursor:not-allowed;}
 .toast{position:fixed; top:14px; left:50%; transform:translateX(-50%); background:#7a241b; color:#fff;
   padding:10px 18px; border-radius:8px; z-index:60; font-size:14px; box-shadow:0 4px 16px rgba(0,0,0,.5);}
 
-/* บังคับแนวนอนบนมือถือ */
-@media (max-width:820px) and (orientation:portrait){
-  #rotate{display:flex !important;}
+/* ===== มือถือแนวตั้ง — จัดโซนใหม่ให้พอดีจอแคบ-ยาว (เล่นได้ทั้ง 2 แนว) ===== */
+@media (orientation:portrait){
+  :root{--meld-h:clamp(32px,5vh,46px); --meld-w:calc(var(--meld-h)*0.7); --hand-h:clamp(50px,9vh,72px); --tray-h:calc(var(--hand-h) + 32px);}
+  .board{
+    grid-template-columns:1fr 1fr 1fr; grid-template-rows:auto auto minmax(0,1fr);
+    grid-template-areas:
+      "top    left   right"
+      "center center center"
+      "mine   mine   mine";
+    gap:5px; padding:6px 6px 4px;
+  }
+  .pzone:not(.seat-self){max-height:22vh;}
+  .pzone:not(.seat-self) .melds{flex-wrap:nowrap; overflow-x:auto; align-items:center; align-content:center;}
+  .zone-head{padding:4px 6px; gap:5px;}
+  .zone-head .avatar{width:26px; height:26px; font-size:13px;}
+  .zone-head .nm{font-size:10px;} .zone-head .sc{font-size:9px;} .zone-head .cnt{font-size:9px;}
+  .rail{gap:8px; padding:6px 8px; width:100%;}
 }

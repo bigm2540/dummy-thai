@@ -69,6 +69,22 @@ const Render = (() => {
 
   function backEl() { const d = document.createElement('div'); d.className = 'card-back'; return d; }
 
+  // หัวโซนผู้เล่น: avatar + ชื่อ + คะแนน + ตา + จำนวนไพ่ในมือ
+  function zoneHead(p, isTurn, score, handCount, isHost, label) {
+    const head = document.createElement('div'); head.className = 'zone-head';
+    const av = document.createElement('div'); av.className = 'avatar' + (p && !p.connected ? ' off' : '');
+    av.textContent = ((label || (p && p.name) || '?').trim()[0] || '?').toUpperCase();
+    const who = document.createElement('div'); who.className = 'who';
+    who.innerHTML = `<div class="nm">${label || p.name}${isHost ? ' <span class="host-badge">★</span>' : ''}</div>`
+      + `<div class="sc">${fmt(score)}</div>`;
+    head.appendChild(av); head.appendChild(who);
+    if (isTurn) { const t = document.createElement('span'); t.className = 'turn-tag'; t.textContent = 'ตา'; head.appendChild(t); }
+    const cnt = document.createElement('div'); cnt.className = 'cnt';
+    cnt.innerHTML = `ไพ่ <span class="pill">${handCount}</span>`;
+    head.appendChild(cnt);
+    return head;
+  }
+
   function renderSeat(slot, seatIdx, view, ctx) {
     const r = view.round;
     const box = document.querySelector(`.seat-${slot}`);
@@ -76,22 +92,15 @@ const Render = (() => {
     const pid = r.playerIds[seatIdx];
     const p = view.players.find((x) => x.id === pid);
     const isTurn = r.currentSeat === seatIdx && r.status === 'PLAYING';
+    const mine = r.melds.filter((m) => m.ownerId === pid);
     box.classList.toggle('active', isTurn);
+    box.classList.toggle('empty', mine.length === 0);
     box.innerHTML = '';
 
-    const nm = document.createElement('div'); nm.className = 'nm';
-    nm.innerHTML = `<span class="dot${p.connected ? '' : ' off'}"></span><span>${p.name}</span>`
-      + (pid === view.hostId ? ' <span class="host-badge">★</span>' : '')
-      + (isTurn ? '<span class="turn-tag">ตา</span>' : '')
-      + `<span class="sc">${fmt(r.scores[pid])}</span>`;
-    box.appendChild(nm);
-
-    const backs = document.createElement('div'); backs.className = 'backs';
-    for (let i = 0; i < r.handCounts[pid]; i++) backs.appendChild(backEl());
-    box.appendChild(backs);
+    box.appendChild(zoneHead(p, isTurn, r.scores[pid], r.handCounts[pid], pid === view.hostId));
 
     const melds = document.createElement('div'); melds.className = 'melds';
-    r.melds.filter((m) => m.ownerId === pid).forEach((m) => melds.appendChild(meldBox(m, r.headId, ctx)));
+    mine.forEach((m) => melds.appendChild(meldBox(m, r.headId, ctx)));
     box.appendChild(melds);
   }
 
@@ -119,18 +128,18 @@ const Render = (() => {
       dp.appendChild(el);
     });
 
-    // โซนของเรา: melds + status + มือ
-    let myMelds = $('my-melds');
-    if (!myMelds) {
-      myMelds = document.createElement('div'); myMelds.id = 'my-melds'; myMelds.className = 'melds';
-      $('status-bar').before(myMelds);
-    }
-    myMelds.innerHTML = '';
-    r.melds.filter((m) => m.ownerId === view.you).forEach((m) => myMelds.appendChild(meldBox(m, r.headId, ctx)));
-
+    // โซนของเรา: หัว + ไพ่ที่เราเกิด (อยู่บนกระดาน แยกจากแถบไพ่มือ → ปุ่มไม่ถูกดันตกจอ)
     const me = view.players.find((x) => x.id === view.you);
     const mySeat = r.playerIds.indexOf(view.you);
     const yourTurn = r.currentSeat === mySeat;
+    const mine = r.melds.filter((m) => m.ownerId === view.you);
+    const myZone = $('my-zone');
+    myZone.classList.toggle('active', yourTurn && r.status === 'PLAYING');
+    myZone.classList.toggle('empty', mine.length === 0);
+    const myHead = $('my-head'); myHead.innerHTML = '';
+    myHead.appendChild(zoneHead(me, yourTurn && r.status === 'PLAYING', r.scores[view.you], r.yourHand.length, me.id === view.hostId, 'คุณ'));
+    const myMelds = $('my-melds'); myMelds.innerHTML = '';
+    mine.forEach((m) => myMelds.appendChild(meldBox(m, r.headId, ctx)));
     $('status-bar').innerHTML =
       `ห้อง <b>${view.code}</b> · ตาที่ <b>${r.turnNo}</b> · ${yourTurn ? '<b>ตาคุณ!</b>' : 'รอตาคุณ'} · ` +
       `ช่วง <b>${r.phase === 'DRAW' ? 'จั่ว/เก็บ' : 'ลงไพ่/ทิ้ง'}</b> · คะแนนคุณ <b>${fmt(r.scores[view.you])}</b>` +
