@@ -224,6 +224,45 @@
     }
   }
 
+  // ---------- แชร์ลิงก์ห้อง ----------
+  // ลิงก์ชวนเพื่อน: เปิดแล้วจะเติมรหัสห้องให้อัตโนมัติ (ดู initRoomParam ด้านล่าง)
+  function roomLink() {
+    const code = (view && view.code) || '';
+    return `${location.origin}${location.pathname}?room=${encodeURIComponent(code)}`;
+  }
+  function copyText(text) {
+    const legacy = () => new Promise((resolve, reject) => {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.focus(); ta.select();
+        const ok = document.execCommand('copy'); document.body.removeChild(ta);
+        ok ? resolve() : reject(new Error('copy failed'));
+      } catch (e) { reject(e); }
+    });
+    if (navigator.clipboard && window.isSecureContext) {
+      return navigator.clipboard.writeText(text).catch(() => legacy()); // เผื่อ API ถูกปฏิเสธ (เช่น แท็บไม่โฟกัส) → ใช้วิธีเดิม
+    }
+    return legacy();
+  }
+  async function shareLink() {
+    const code = view && view.code;
+    if (!code) return Render.toast('ยังไม่มีห้อง');
+    const url = roomLink();
+    const text = `มาเล่นดัมมี่ไทยกัน! ห้อง ${code}`;
+    if (navigator.share) {
+      try { await navigator.share({ title: 'ดัมมี่ไทย 🎴', text, url }); return; }
+      catch (e) { if (e && e.name === 'AbortError') return; /* ไม่รองรับ → fallback คัดลอก */ }
+    }
+    copyLink();
+  }
+  async function copyLink() {
+    const code = view && view.code;
+    if (!code) return Render.toast('ยังไม่มีห้อง');
+    try { await copyText(roomLink()); Render.toast('คัดลอกลิงก์ห้องแล้ว ✓ ส่งให้เพื่อนได้เลย'); }
+    catch { Render.toast('คัดลอกไม่ได้ — ลิงก์: ' + roomLink()); }
+  }
+
   // เลือกเรทเงิน (ล็อบบี้)
   $('rate-opts').addEventListener('click', (e) => {
     const b = e.target.closest('.rate-opt'); if (!b) return;
@@ -249,6 +288,8 @@
   $('btn-create').onclick = createRoom;
   $('btn-join').onclick = joinRoom;
   $('btn-leave').onclick = leaveRoom;
+  $('btn-share').onclick = shareLink;
+  $('btn-copy-link').onclick = copyLink;
   $('btn-start').onclick = () => Net.emit('room:start', {}).then((r) => { if (!r.ok) Render.toast(r.error); });
 
   // ปุ่มในจอสรุป (สร้าง dynamic — ผูกด้วย delegation)
@@ -271,4 +312,17 @@
   }
   // รอ socket เชื่อมก่อนค่อย rejoin
   Net.on('connect', tryReconnect);
+
+  // ---------- เปิดจากลิงก์ชวนเพื่อน (?room=CODE) → เติมรหัสห้องให้ ----------
+  (function initRoomParam() {
+    try {
+      const raw = new URLSearchParams(location.search).get('room');
+      if (!raw) return;
+      const code = raw.trim().toUpperCase().slice(0, 4);
+      if (!code) return;
+      const ci = $('code-input'); if (ci) ci.value = code;
+      const ni = $('name-input'); if (ni) ni.focus();
+      Render.toast(`เข้าห้อง ${code} — ใส่ชื่อแล้วกด “เข้าห้อง”`);
+    } catch { /* ignore */ }
+  })();
 })();
