@@ -35,7 +35,11 @@
   <section id="screen-waiting" class="screen hidden">
     <div class="card-panel">
       <h2>ห้อง <span id="room-code" class="code"></span></h2>
-      <p class="hint">บอกรหัสนี้ให้เพื่อน — เริ่มได้เมื่อครบ 4 คน</p>
+      <p class="hint">ชวนเพื่อนด้วยการแชร์ลิงก์ หรือบอกรหัสห้อง — เริ่มได้เมื่อครบ 4 คน</p>
+      <div id="share-box" style="display:flex;flex-direction:column;gap:8px;margin:4px 0 10px">
+        <button id="btn-share" class="primary">🔗 แชร์ลิงก์ห้องให้เพื่อน</button>
+        <button id="btn-copy-link">คัดลอกลิงก์</button>
+      </div>
       <ul id="waiting-players" class="player-list"></ul>
       <button id="btn-start" class="primary hidden">เริ่มเกม</button>
       <p id="waiting-hint" class="hint"></p>
