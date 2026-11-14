@@ -47,47 +47,51 @@
     </div>
   </section>
 
-  <!-- ===== จอ 3: โต๊ะเล่น (เล่นได้ทั้งแนวตั้ง-แนวนอน) ===== -->
+  <!-- ===== จอ 3: โต๊ะเล่น (ที่นั่ง 2 ซ้าย/2 ขวา · บอร์ดกลาง 4 โซนเกิด + แถบกองทิ้งกลาง) ===== -->
   <section id="screen-table" class="screen hidden">
     <div class="table-grid">
-      <!-- กระดาน: โซนผู้เล่นรอบโต๊ะ + กองกลาง -->
-      <div class="board">
-        <!-- คู่ต่อสู้ 3 คน (แต่ละคนมีโซนไพ่ที่เกิดของตัวเอง) -->
-        <div class="pzone seat-top"   data-slot="top"></div>
-        <div class="pzone seat-left"  data-slot="left"></div>
-        <div class="pzone seat-right" data-slot="right"></div>
+      <div class="mid">
+        <!-- ที่นั่ง 4 คน: ซ้ายบน=tl, ขวาบน=tr, ซ้ายล่าง=เรา, ขวาล่าง=br -->
+        <div class="seat-chip" data-slot="tl"></div>
+        <div class="seat-chip" data-slot="tr"></div>
+        <div class="seat-chip me" data-slot="me"></div>
+        <div class="seat-chip" data-slot="br"></div>
 
-        <!-- กลางโต๊ะ: กองจั่ว + กองทิ้ง -->
-        <div class="center">
-          <div class="rail">
+        <!-- บอร์ดกลาง: โซนเกิด 4 ช่อง + แถบกองทิ้งกลาง + ปุ่มลอย -->
+        <div class="board">
+          <div class="meldrow top">
+            <div class="meldzone" data-mz="tl"></div>
+            <div class="meldzone" data-mz="tr"></div>
+          </div>
+          <div class="discard-band">
             <div class="stock">
               <div class="card-back lg" id="stock-pile"></div>
               <div class="stock-count" id="stock-count">0</div>
             </div>
-            <div class="discard-wrap">
-              <div class="discard-label">กองทิ้ง</div>
-              <div id="discard-pile" class="discard-pile"></div>
-            </div>
+            <div id="discard-pile" class="discard-pile"></div>
+          </div>
+          <div class="meldrow bottom">
+            <div class="meldzone" data-mz="me"></div>
+            <div class="meldzone" data-mz="br"></div>
+          </div>
+          <!-- ปุ่มจังหวะ (ลอยกลาง-ล่างบอร์ด) -->
+          <div class="action-float">
+            <div id="hint-bar" class="hint-bar"></div>
+            <div id="action-bar" class="action-bar"></div>
           </div>
         </div>
-
-        <!-- โซนของเรา (ไพ่ที่เราเกิด) -->
-        <div class="pzone seat-self" id="my-zone">
-          <div class="zone-head" id="my-head"></div>
-          <div class="melds" id="my-melds"></div>
-        </div>
       </div>
 
-      <!-- แถบปุ่ม (ลอยกลาง เหนือไพ่มือ · อยู่ในโฟลว์ ไม่บังโซนเกิด ไม่ดันจอ) -->
-      <div class="action-float">
-        <div id="hint-bar" class="hint-bar"></div>
-        <div id="action-bar" class="action-bar"></div>
-      </div>
-
-      <!-- แถบไพ่มือ (บาง · ล็อกล่างจอ) -->
+      <!-- แถบไพ่มือ (ล่างสุด เต็มกว้าง) + ปุ่มเรียง -->
       <div class="tray">
-        <button id="btn-money" class="money-btn">💰 เงิน</button>
-        <div id="status-bar" class="status-bar"></div>
+        <div class="tray-top">
+          <button id="btn-money" class="money-btn">💰 เงิน</button>
+          <div id="status-bar" class="status-bar"></div>
+          <div class="sort-btns">
+            <button id="btn-sort-suit" class="sort-btn">⬛ ดอก</button>
+            <button id="btn-sort-rank" class="sort-btn">🔢 เลข</button>
+          </div>
+        </div>
         <div id="my-hand" class="my-hand"></div>
       </div>
     </div>

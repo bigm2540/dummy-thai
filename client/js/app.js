@@ -38,10 +38,38 @@
       meldTargetable: mode === 'layoff' || mode === 'pickLayoff',
       onHandClick,
       onHandPointerDown,
+      onHandSlotClick,
       onDiscardClick,
       onMeldClick,
       orderHand,
     };
+  }
+
+  // แตะช่อง ＋ = ย้ายไพ่ที่เลือก (1 ใบ) มาตำแหน่งนี้ (คงการเลือกไว้ → ช่องอัปเดตตาม)
+  function onHandSlotClick(pos) {
+    if (selected.size !== 1) return;
+    const id = [...selected][0];
+    const from = handOrder.indexOf(id);
+    if (from < 0) return;
+    handOrder.splice(from, 1);
+    let to = pos; if (to > from) to -= 1; if (to < 0) to = 0;
+    handOrder.splice(to, 0, id);
+    draw();
+  }
+
+  // เรียงไพ่ในมืออัตโนมัติ (ตามดอก หรือ ตามเลข)
+  function rankVal(rank) {
+    return { A: 14, K: 13, Q: 12, J: 11, '10': 10, 9: 9, 8: 8, 7: 7, 6: 6, 5: 5, 4: 4, 3: 3, 2: 2 }[rank] || 0;
+  }
+  function sortHand(by) {
+    if (!view || !view.round) return;
+    const suitOrder = { S: 0, H: 1, D: 2, C: 3 };
+    const cards = view.round.yourHand.slice();
+    cards.sort((a, b) => (by === 'suit'
+      ? (suitOrder[a.suit] - suitOrder[b.suit]) || (rankVal(b.rank) - rankVal(a.rank))
+      : (rankVal(b.rank) - rankVal(a.rank)) || (suitOrder[a.suit] - suitOrder[b.suit])));
+    handOrder = cards.map((c) => c.id);
+    draw();
   }
 
   function onHandClick(id) {
@@ -290,6 +318,8 @@
   $('btn-leave').onclick = leaveRoom;
   $('btn-share').onclick = shareLink;
   $('btn-copy-link').onclick = copyLink;
+  $('btn-sort-suit').onclick = () => sortHand('suit');
+  $('btn-sort-rank').onclick = () => sortHand('rank');
   $('btn-start').onclick = () => Net.emit('room:start', {}).then((r) => { if (!r.ok) Render.toast(r.error); });
 
   // ปุ่มในจอสรุป (สร้าง dynamic — ผูกด้วย delegation)
