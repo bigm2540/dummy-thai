@@ -85,35 +85,50 @@ const Render = (() => {
     return head;
   }
 
-  function renderSeat(slot, seatIdx, view, ctx) {
+  // วาด 1 ที่นั่ง: ชิป (avatar/ชื่อ/คะแนน/ตา/จำนวนไพ่) + โซนเกิดของคนนั้น
+  function renderSeatInto(pos, view, ctx, isMe, seatIdx) {
     const r = view.round;
-    const box = document.querySelector(`.seat-${slot}`);
-    if (!box) return;
-    const pid = r.playerIds[seatIdx];
+    const chip = document.querySelector(`.seat-chip[data-slot="${isMe ? 'me' : pos}"]`);
+    const mz = document.querySelector(`.meldzone[data-mz="${isMe ? 'me' : pos}"]`);
+    if (!chip || !mz) return;
+    const pid = isMe ? view.you : r.playerIds[seatIdx];
+    if (pid == null) { chip.innerHTML = ''; mz.innerHTML = ''; chip.classList.remove('active'); mz.classList.remove('active'); return; }
     const p = view.players.find((x) => x.id === pid);
-    const isTurn = r.currentSeat === seatIdx && r.status === 'PLAYING';
+    const mySeat = r.playerIds.indexOf(view.you);
+    const isTurn = (isMe ? r.currentSeat === mySeat : r.currentSeat === seatIdx) && r.status === 'PLAYING';
+    const handCount = isMe ? r.yourHand.length : r.handCounts[pid];
     const mine = r.melds.filter((m) => m.ownerId === pid);
-    box.classList.toggle('active', isTurn);
-    box.classList.toggle('empty', mine.length === 0);
-    box.innerHTML = '';
 
-    box.appendChild(zoneHead(p, isTurn, r.scores[pid], r.handCounts[pid], pid === view.hostId));
+    chip.classList.toggle('active', isTurn);
+    chip.innerHTML = '';
+    chip.appendChild(zoneHead(p, isTurn, r.scores[pid], handCount, pid === view.hostId, isMe ? 'คุณ' : null));
 
-    const melds = document.createElement('div'); melds.className = 'melds';
-    mine.forEach((m) => melds.appendChild(meldBox(m, r.headId, ctx)));
-    box.appendChild(melds);
+    mz.classList.toggle('active', isTurn);
+    mz.classList.toggle('empty', mine.length === 0);
+    mz.innerHTML = '';
+    mine.forEach((m) => mz.appendChild(meldBox(m, r.headId, ctx)));
+  }
+
+  // ช่องแตะย้ายไพ่ (ย้ายใบที่เลือกมาตำแหน่งนี้)
+  function slotEl(pos, ctx) {
+    const s = document.createElement('div');
+    s.className = 'tap-slot';
+    s.onclick = () => ctx.onHandSlotClick(pos);
+    return s;
   }
 
   function table(view, ctx) {
     showScreen('screen-table');
     const r = view.round;
-    const slots = seatSlots(view);
-    Object.entries(slots).forEach(([slot, seatIdx]) => renderSeat(slot, seatIdx, view, ctx));
+    // ที่นั่ง: tl=ซ้าย(+3) · tr=บน(+2) · br=ขวา(+1) · me=เรา
+    const map = seatSlots(view); // {right,top,left}
+    renderSeatInto('tl', view, ctx, false, map.left);
+    renderSeatInto('tr', view, ctx, false, map.top);
+    renderSeatInto('br', view, ctx, false, map.right);
+    renderSeatInto('me', view, ctx, true, null);
 
-    // กองจั่ว
-    $('stock-count').textContent = `เหลือ ${r.stockCount}`;
-
-    // กองทิ้ง (ทุกใบ): โหมด pick = แตะเลือกเป้าหมาย · โหมด pickPlan = ใบเหนือเป้าหมายแตะเลือกมาเข้าชุดได้
+    // แถบกองกลาง: เลขกองจั่ว + กองทิ้ง (เรียงไปทางขวา)
+    $('stock-count').textContent = `${r.stockCount}`;
     const dp = $('discard-pile'); dp.innerHTML = '';
     r.discard.forEach((c, i) => {
       const isTarget = ctx.mode === 'pickPlan' && i === ctx.pickTarget;
@@ -128,31 +143,30 @@ const Render = (() => {
       dp.appendChild(el);
     });
 
-    // โซนของเรา: หัว + ไพ่ที่เราเกิด (อยู่บนกระดาน แยกจากแถบไพ่มือ → ปุ่มไม่ถูกดันตกจอ)
-    const me = view.players.find((x) => x.id === view.you);
+    // สถานะ (แถบบนถาดมือ)
     const mySeat = r.playerIds.indexOf(view.you);
     const yourTurn = r.currentSeat === mySeat;
-    const mine = r.melds.filter((m) => m.ownerId === view.you);
-    const myZone = $('my-zone');
-    myZone.classList.toggle('active', yourTurn && r.status === 'PLAYING');
-    myZone.classList.toggle('empty', mine.length === 0);
-    const myHead = $('my-head'); myHead.innerHTML = '';
-    myHead.appendChild(zoneHead(me, yourTurn && r.status === 'PLAYING', r.scores[view.you], r.yourHand.length, me.id === view.hostId, 'คุณ'));
-    const myMelds = $('my-melds'); myMelds.innerHTML = '';
-    mine.forEach((m) => myMelds.appendChild(meldBox(m, r.headId, ctx)));
     $('status-bar').innerHTML =
       `ห้อง <b>${view.code}</b> · ตาที่ <b>${r.turnNo}</b> · ${yourTurn ? '<b>ตาคุณ!</b>' : 'รอตาคุณ'} · ` +
-      `ช่วง <b>${r.phase === 'DRAW' ? 'จั่ว/เก็บ' : 'ลงไพ่/ทิ้ง'}</b> · คะแนนคุณ <b>${fmt(r.scores[view.you])}</b>` +
-      (r.lastTurn ? ' · <b>⚠️ ตาสุดท้าย (กองหมด)</b>' : '');
+      `ช่วง <b>${r.phase === 'DRAW' ? 'จั่ว/เก็บ' : 'ลงไพ่/ทิ้ง'}</b> · คะแนน <b>${fmt(r.scores[view.you])}</b>` +
+      (r.lastTurn ? ' · <b>⚠️ ตาสุดท้าย</b>' : '');
 
-    // มือเรา (เรียงตามที่ผู้เล่นจัดเอง + รองรับลากสลับ)
+    // มือเรา (เรียงตามที่ผู้เล่นจัดเอง · ลาก=จัดเรียง / แตะ=เลือก · เลือก 1 ใบ → มีช่อง ＋ ให้แตะย้าย)
     const hand = $('my-hand'); hand.innerHTML = '';
     const ordered = ctx.orderHand ? ctx.orderHand(r.yourHand) : r.yourHand;
-    ordered.forEach((c) => {
+    const selArr = [...ctx.selected];
+    const singleSel = selArr.length === 1 ? selArr[0] : null;
+    ordered.forEach((c, idx) => {
+      if (singleSel && c.id !== singleSel && (idx === 0 || ordered[idx - 1].id !== singleSel)) {
+        hand.appendChild(slotEl(idx, ctx));
+      }
       const el = cardEl(c, { headId: r.headId, small: false, selectable: true, selected: ctx.selected.has(c.id) });
-      el.onpointerdown = (e) => ctx.onHandPointerDown(e, c.id, el); // ลาก=จัดเรียง / แตะ=เลือก
+      el.onpointerdown = (e) => ctx.onHandPointerDown(e, c.id, el);
       hand.appendChild(el);
     });
+    if (singleSel && ordered.length && ordered[ordered.length - 1].id !== singleSel) {
+      hand.appendChild(slotEl(ordered.length, ctx));
+    }
   }
 
   // ---------- สรุป ----------
